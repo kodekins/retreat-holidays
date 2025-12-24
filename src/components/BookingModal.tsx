@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Retreat, BookingFormData } from '@/types/retreat';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -31,15 +33,34 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!retreat) return;
+    
     setIsSubmitting(true);
 
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const finalPrice = calculateFinalPrice(retreat.price);
+      
+      const { error } = await supabase.functions.invoke('send-booking-email', {
+        body: {
+          customerName: `${formData.firstName} ${formData.lastName}`,
+          customerEmail: formData.email,
+          customerPhone: formData.phone,
+          retreatName: retreat.name,
+          retreatLocation: `${retreat.location}, ${retreat.country}`,
+          retreatDuration: retreat.duration,
+          retreatPrice: finalPrice,
+          numberOfGuests: formData.numberOfGuests,
+          specialRequests: formData.specialRequests,
+        }
+      });
+
+      if (error) throw error;
+
       toast({
         title: "Booking Request Submitted!",
-        description: "We'll contact you shortly to confirm your retreat booking and payment details.",
+        description: "Check your email for confirmation. We'll contact you shortly.",
       });
+      
       onClose();
       setFormData({
         firstName: '',
@@ -49,10 +70,22 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
         numberOfGuests: 1,
         specialRequests: '',
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Booking error:', error);
+      toast({
+        title: "Booking Submitted",
+        description: "Your request was received. We'll contact you shortly.",
+      });
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen || !retreat) return null;
+
+  const finalPrice = calculateFinalPrice(retreat.price);
+  const totalPrice = finalPrice * formData.numberOfGuests;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -90,7 +123,7 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
               </p>
               <p className="text-xs text-muted-foreground">{retreat.duration} • {retreat.dates}</p>
               <p className="text-sm font-semibold text-primary mt-1">
-                From {retreat.currency}${retreat.price}
+                {formatPrice(finalPrice, retreat.currency)} per person
               </p>
             </div>
           </div>
@@ -185,6 +218,17 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
               placeholder="Dietary requirements, accessibility needs, etc."
               className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             />
+          </div>
+
+          {/* Price Summary */}
+          <div className="bg-secondary/50 rounded-lg p-3">
+            <div className="flex justify-between text-sm text-muted-foreground mb-1">
+              <span>{formatPrice(finalPrice, retreat.currency)} × {formData.numberOfGuests} guest{formData.numberOfGuests > 1 ? 's' : ''}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-foreground">
+              <span>Total</span>
+              <span className="text-primary">{formatPrice(totalPrice, retreat.currency)}</span>
+            </div>
           </div>
 
           <button

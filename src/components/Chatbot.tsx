@@ -4,6 +4,8 @@ import { ChatMessage, Retreat } from '@/types/retreat';
 import { searchRetreats } from '@/data/retreats';
 import RetreatCard from './RetreatCard';
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -12,7 +14,13 @@ interface ChatbotProps {
   onBookRetreat: (retreat: Retreat) => void;
 }
 
+interface AIMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps) => {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -21,6 +29,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       timestamp: new Date(),
     },
   ]);
+  const [conversationHistory, setConversationHistory] = useState<AIMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -61,28 +70,62 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI processing
-    setTimeout(() => {
-      const retreats = searchRetreats(text);
+    const newConversationHistory: AIMessage[] = [
+      ...conversationHistory,
+      { role: 'user', content: text }
+    ];
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { messages: newConversationHistory }
+      });
+
+      if (error) throw error;
+
+      const aiContent = data?.content || "I'm sorry, I couldn't process your request.";
       
-      let responseContent = '';
-      if (retreats.length > 0) {
-        responseContent = `I found ${retreats.length} great option${retreats.length > 1 ? 's' : ''} for you! Here's what I recommend:`;
-      } else {
-        responseContent = "I couldn't find retreats matching your exact criteria. Here are some of our popular retreats that you might enjoy:";
-      }
+      // Search for retreats based on user query
+      const retreats = searchRetreats(text);
 
       const assistantMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: responseContent,
-        retreats: retreats.length > 0 ? retreats : searchRetreats('yoga wellness'),
+        content: aiContent,
+        retreats: retreats.length > 0 ? retreats : undefined,
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      setConversationHistory([
+        ...newConversationHistory,
+        { role: 'assistant', content: aiContent }
+      ]);
+    } catch (error) {
+      console.error('AI chat error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
+
+      // Fallback to basic search
+      const retreats = searchRetreats(text);
+      const fallbackContent = retreats.length > 0
+        ? `I found ${retreats.length} retreat${retreats.length > 1 ? 's' : ''} that might interest you:`
+        : "Here are some popular retreats you might enjoy:";
+
+      const fallbackMessage: ChatMessage = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: fallbackContent,
+        retreats: retreats.length > 0 ? retreats : searchRetreats('yoga wellness'),
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, fallbackMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleWhatsApp = (retreat: Retreat) => {
@@ -108,6 +151,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
         timestamp: new Date(),
       },
     ]);
+    setConversationHistory([]);
   };
 
   if (!isOpen) return null;
@@ -179,7 +223,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
           <div className="flex justify-start">
             <div className="bg-secondary rounded-2xl px-4 py-3 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Searching retreats...</span>
+              <span className="text-sm text-muted-foreground">Thinking...</span>
             </div>
           </div>
         )}
