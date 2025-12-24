@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Retreat } from '@/types/retreat';
 import { MessageCircle } from 'lucide-react';
 import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
@@ -8,11 +9,11 @@ interface RetreatCardProps {
   onWhatsApp: (retreat: Retreat) => void;
 }
 
-const RetreatCard = ({ retreat, onBook, onWhatsApp }: RetreatCardProps) => {
+const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(({ retreat, onBook, onWhatsApp }, ref) => {
   const finalPrice = calculateFinalPrice(retreat.price);
 
   return (
-    <div className="bg-card rounded-lg overflow-hidden shadow-md border border-border animate-slide-up">
+    <div ref={ref} className="bg-card rounded-lg overflow-hidden shadow-md border border-border animate-slide-up">
       <div className="relative">
         <img
           src={retreat.image}
@@ -65,6 +66,8 @@ const RetreatCard = ({ retreat, onBook, onWhatsApp }: RetreatCardProps) => {
       </div>
     </div>
   );
-};
+});
+
+RetreatCard.displayName = 'RetreatCard';
 
 export default RetreatCard;
