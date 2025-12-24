@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, MessageCircle } from 'lucide-react';
 import { Retreat, BookingFormData } from '@/types/retreat';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
 
 interface BookingModalProps {
@@ -13,7 +12,6 @@ interface BookingModalProps {
 
 const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<BookingFormData>({
     firstName: '',
     lastName: '',
@@ -31,55 +29,34 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleWhatsAppBooking = () => {
+    if (!retreat) return;
+    const finalPrice = calculateFinalPrice(retreat.price);
+    const message = encodeURIComponent(
+      `Hi! I'd like to book the "${retreat.name}" retreat.\n\n` +
+      `📍 Location: ${retreat.location}, ${retreat.country}\n` +
+      `📅 Duration: ${retreat.duration}\n` +
+      `💰 Price: ${formatPrice(finalPrice, retreat.currency)}\n\n` +
+      `My Details:\n` +
+      `Name: ${formData.firstName} ${formData.lastName}\n` +
+      `Email: ${formData.email}\n` +
+      `Phone: ${formData.phone}\n` +
+      `Guests: ${formData.numberOfGuests}\n` +
+      `${formData.specialRequests ? `Special Requests: ${formData.specialRequests}` : ''}`
+    );
+    window.open(`https://wa.me/23058461923?text=${message}`, '_blank');
+    
+    toast({
+      title: "Opening WhatsApp",
+      description: "Complete your booking via WhatsApp.",
+    });
+    onClose();
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!retreat) return;
-    
-    setIsSubmitting(true);
-
-    try {
-      const finalPrice = calculateFinalPrice(retreat.price);
-      
-      const { error } = await supabase.functions.invoke('send-booking-email', {
-        body: {
-          customerName: `${formData.firstName} ${formData.lastName}`,
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-          retreatName: retreat.name,
-          retreatLocation: `${retreat.location}, ${retreat.country}`,
-          retreatDuration: retreat.duration,
-          retreatPrice: finalPrice,
-          numberOfGuests: formData.numberOfGuests,
-          specialRequests: formData.specialRequests,
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Booking Request Submitted!",
-        description: "Check your email for confirmation. We'll contact you shortly.",
-      });
-      
-      onClose();
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        numberOfGuests: 1,
-        specialRequests: '',
-      });
-    } catch (error) {
-      console.error('Booking error:', error);
-      toast({
-        title: "Booking Submitted",
-        description: "Your request was received. We'll contact you shortly.",
-      });
-      onClose();
-    } finally {
-      setIsSubmitting(false);
-    }
+    handleWhatsAppBooking();
   };
 
   if (!isOpen || !retreat) return null;
@@ -233,21 +210,14 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
 
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3 bg-whatsapp text-whatsapp-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              'Proceed to Payment'
-            )}
+            <MessageCircle className="w-5 h-5" />
+            Book via WhatsApp
           </button>
 
           <p className="text-xs text-muted-foreground text-center">
-            By clicking "Proceed to Payment", you agree to our terms and conditions.
+            You'll be redirected to WhatsApp to complete your booking.
           </p>
         </form>
       </div>
