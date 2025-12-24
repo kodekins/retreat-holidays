@@ -1,7 +1,6 @@
 import { X, RefreshCw, Send, Loader2, Droplet } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Retreat } from '@/types/retreat';
-import { searchRetreats } from '@/data/retreats';
 import RetreatCard from './RetreatCard';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,13 +18,28 @@ interface AIMessage {
   content: string;
 }
 
+interface APIRetreat {
+  id: string;
+  name: string;
+  location: string;
+  country: string;
+  duration: string;
+  price: number;
+  currency: string;
+  description: string;
+  activities: string[];
+  source: string;
+  url?: string;
+  image?: string;
+}
+
 const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: "Hello! I'm your Retreats Holidays assistant. Tell me what kind of retreat you're looking for - yoga, meditation, surf, wellness - and I'll find the perfect match for you!",
+      content: "Hello! I'm your Retreats Holidays assistant. Tell me what kind of retreat you're looking for - your preferred location, budget, activities, and duration - and I'll find the perfect options for you!",
       timestamp: new Date(),
     },
   ]);
@@ -55,6 +69,23 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     }
   }, [isOpen]);
 
+  // Convert API retreat to app Retreat format
+  const convertToRetreat = (apiRetreat: APIRetreat): Retreat => ({
+    id: apiRetreat.id,
+    name: apiRetreat.name,
+    location: apiRetreat.location,
+    country: apiRetreat.country,
+    dates: 'Flexible Dates',
+    duration: apiRetreat.duration,
+    price: apiRetreat.price,
+    currency: apiRetreat.currency || 'USD',
+    image: apiRetreat.image || 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80',
+    description: apiRetreat.description,
+    activities: apiRetreat.activities,
+    category: apiRetreat.activities[0]?.toLowerCase() || 'wellness',
+    rating: 4.8,
+  });
+
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || input;
     if (!text.trim()) return;
@@ -82,10 +113,10 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
 
       if (error) throw error;
 
-      const aiContent = data?.content || "I'm sorry, I couldn't process your request.";
+      const aiContent = data?.content || "Here are some great retreat options for you!";
       
-      // Search for retreats based on user query
-      const retreats = searchRetreats(text);
+      // Convert API retreats to app format
+      const retreats: Retreat[] = (data?.retreats || []).map(convertToRetreat);
 
       const assistantMessage: ChatMessage = {
         id: uuidv4(),
@@ -108,17 +139,10 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
         variant: "destructive",
       });
 
-      // Fallback to basic search
-      const retreats = searchRetreats(text);
-      const fallbackContent = retreats.length > 0
-        ? `I found ${retreats.length} retreat${retreats.length > 1 ? 's' : ''} that might interest you:`
-        : "Here are some popular retreats you might enjoy:";
-
       const fallbackMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: fallbackContent,
-        retreats: retreats.length > 0 ? retreats : searchRetreats('yoga wellness'),
+        content: "I'm having trouble connecting right now. Please try again in a moment.",
         timestamp: new Date(),
       };
 
@@ -203,8 +227,11 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
                   {message.content}
                 </div>
                 {message.retreats && message.retreats.length > 0 && (
-                  <div className="space-y-3">
-                    {message.retreats.slice(0, 3).map((retreat) => (
+                  <div className="space-y-3 mt-2">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Found {message.retreats.length} retreats matching your preferences:
+                    </p>
+                    {message.retreats.slice(0, 5).map((retreat) => (
                       <RetreatCard
                         key={retreat.id}
                         retreat={retreat}
