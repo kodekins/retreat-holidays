@@ -1,5 +1,6 @@
 import { Retreat } from '@/types/retreat';
 import { MessageCircle } from 'lucide-react';
+import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
 
 interface RetreatCardProps {
   retreat: Retreat;
@@ -8,6 +9,8 @@ interface RetreatCardProps {
 }
 
 const RetreatCard = ({ retreat, onBook, onWhatsApp }: RetreatCardProps) => {
+  const finalPrice = calculateFinalPrice(retreat.price);
+
   return (
     <div className="bg-card rounded-lg overflow-hidden shadow-md border border-border animate-slide-up">
       <div className="relative">
@@ -36,7 +39,7 @@ const RetreatCard = ({ retreat, onBook, onWhatsApp }: RetreatCardProps) => {
             <span className="font-medium text-foreground">Dates:</span> {retreat.dates}
           </li>
           <li>
-            <span className="font-medium text-foreground">Budget:</span> From {retreat.currency}${retreat.price}
+            <span className="font-medium text-foreground">Budget:</span> {formatPrice(finalPrice, retreat.currency)}
           </li>
         </ul>
         
