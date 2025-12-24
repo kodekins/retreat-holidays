@@ -1,7 +1,13 @@
 project_id = "zsrsfzlmspmjjnwopefd"
 
+[api]
+enabled = true
+
 [functions.ai-chat]
 verify_jwt = false
 
 [functions.send-booking-email]
+verify_jwt = false
+
+[functions.search-retreats]
 verify_jwt = false

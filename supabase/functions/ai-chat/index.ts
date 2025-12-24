@@ -5,103 +5,127 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Function to search for retreats on popular platforms
-async function searchRetreats(query: string): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+// Function to search for real retreats using Firecrawl
+async function searchRealRetreats(query: string, preferences: any): Promise<string> {
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
   
-  if (!LOVABLE_API_KEY) {
-    console.log("No API key for web search, using fallback data");
+  if (!FIRECRAWL_API_KEY) {
+    console.log("No Firecrawl API key, using fallback data");
     return "";
   }
 
   try {
-    // Use web search to find real retreats from famous platforms
-    const searchPrompt = `Search for retreat and wellness holiday options matching: "${query}"
+    // Build search query based on user preferences
+    const searchTerms = [];
     
-    Search on these famous retreat platforms:
-    - BookRetreats.com
-    - RetreatGuru.com
-    - BookYogaRetreats.com
-    - TripAdvisor Wellness
-    - Airbnb Experiences
+    if (preferences?.location) searchTerms.push(preferences.location);
+    if (preferences?.activities) searchTerms.push(preferences.activities);
+    if (preferences?.budget) searchTerms.push(`under $${preferences.budget}`);
+    if (preferences?.duration) searchTerms.push(`${preferences.duration} days`);
     
-    Return at least 5-7 real retreat options with:
-    - Retreat name and provider/host
-    - Location (city, country)
-    - Duration (days)
-    - Price range in USD
-    - Key activities included
-    - Brief description
-    - Rating if available
-    
-    Format as a structured list.`;
+    const fullQuery = `${query} retreat ${searchTerms.join(" ")} site:bookretreats.com OR site:retreatguru.com OR site:bookyogaretreats.com`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    console.log("Searching real retreats:", fullQuery);
+
+    const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${FIRECRAWL_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { 
-            role: "system", 
-            content: `You are a retreat search expert. Search the web for real retreat options from famous platforms like BookRetreats, RetreatGuru, BookYogaRetreats, TripAdvisor, and Airbnb Experiences. Always provide at least 5 real, bookable retreat options with accurate pricing and details. Include variety in locations and price ranges.` 
-          },
-          { role: "user", content: searchPrompt }
-        ],
+        query: fullQuery,
+        limit: 8,
+        scrapeOptions: {
+          formats: ["markdown"],
+          onlyMainContent: true,
+        },
       }),
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || "";
+    if (!response.ok) {
+      console.log("Firecrawl search failed, using fallback");
+      return "";
     }
-    
-    console.log("Web search failed, using fallback");
-    return "";
+
+    const data = await response.json();
+    const results = data.data || [];
+
+    if (results.length === 0) {
+      return "";
+    }
+
+    // Format results for AI context
+    let formattedResults = "\n\nREAL RETREAT OPTIONS FROM POPULAR PLATFORMS:\n";
+    results.slice(0, 7).forEach((result: any, index: number) => {
+      const source = extractSource(result.url);
+      formattedResults += `\n${index + 1}. ${result.title || "Retreat"}\n`;
+      formattedResults += `   Source: ${source}\n`;
+      formattedResults += `   URL: ${result.url}\n`;
+      if (result.description) {
+        formattedResults += `   ${result.description}\n`;
+      }
+      if (result.markdown) {
+        formattedResults += `   Details: ${result.markdown.substring(0, 300)}...\n`;
+      }
+    });
+
+    console.log("Found", results.length, "real retreat options");
+    return formattedResults;
   } catch (error) {
-    console.error("Error searching retreats:", error);
+    console.error("Error searching real retreats:", error);
     return "";
   }
 }
 
-const FALLBACK_RETREATS = `
-Popular Retreat Options from Major Platforms:
+function extractSource(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    if (hostname.includes("bookretreats")) return "BookRetreats.com";
+    if (hostname.includes("retreatguru")) return "RetreatGuru.com";
+    if (hostname.includes("bookyogaretreats")) return "BookYogaRetreats.com";
+    if (hostname.includes("tripadvisor")) return "TripAdvisor";
+    if (hostname.includes("airbnb")) return "Airbnb Experiences";
+    return hostname;
+  } catch {
+    return "Unknown";
+  }
+}
 
-FROM BOOKRETREATS.COM:
-1. 7 Day Wellness Package, Yoga, Meditation and More - Phetchabun, Thailand
-   Price: $631 USD | Duration: 7 days | Rating: 4.8/5
-   Activities: Daily yoga, meditation, temple visits, Thai cooking classes, spa treatments
-   
-2. 8 Day Holistic Healing & Detox Retreat - Koh Samui, Thailand
-   Price: $890 USD | Duration: 8 days | Rating: 4.9/5
-   Activities: Detox program, yoga, meditation, wellness consultations, healthy cuisine
-
-FROM RETREATGURU.COM:
-3. 5 Day Surf & Yoga Retreat - Canggu, Bali, Indonesia
-   Price: $850 USD | Duration: 5 days | Rating: 4.7/5
-   Activities: Surfing lessons, daily yoga, vegan meals, cultural tours, spa
-
-4. 10 Day Spiritual Awakening Retreat - Rishikesh, India
-   Price: $499 USD | Duration: 10 days | Rating: 4.9/5
-   Activities: Traditional yoga, meditation, Ayurveda, sacred ceremonies, Himalayan treks
-
-FROM BOOKYOGARETREATS.COM:
-5. 6 Day Luxury Ocean View Wellness - Nosara, Costa Rica
-   Price: $1,200 USD | Duration: 6 days | Rating: 4.8/5
-   Activities: Yoga, hiking, wildlife tours, spa treatments, organic farm-to-table cuisine
-
-6. 4 Day Mountain Meditation Escape - Sedona, Arizona, USA
-   Price: $750 USD | Duration: 4 days | Rating: 4.6/5
-   Activities: Guided meditation, energy vortex tours, sound healing, hiking
-
-FROM TRIPADVISOR WELLNESS:
-7. 7 Day Ayurveda & Yoga Immersion - Kerala, India
-   Price: $680 USD | Duration: 7 days | Rating: 4.8/5
-   Activities: Authentic Ayurvedic treatments, yoga, meditation, vegetarian cuisine
-`;
+// Extract user preferences from message
+function extractPreferences(message: string): any {
+  const preferences: any = {};
+  
+  // Extract budget
+  const budgetMatch = message.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|\bunder\s+\$?(\d+)/i);
+  if (budgetMatch) {
+    preferences.budget = budgetMatch[1] || budgetMatch[3];
+  }
+  
+  // Extract duration
+  const durationMatch = message.match(/(\d+)\s*(day|night|week)/i);
+  if (durationMatch) {
+    preferences.duration = durationMatch[1];
+  }
+  
+  // Extract location
+  const locations = ["thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "cambodia", "usa", "europe", "asia"];
+  for (const loc of locations) {
+    if (message.toLowerCase().includes(loc)) {
+      preferences.location = loc;
+      break;
+    }
+  }
+  
+  // Extract activities
+  const activities = ["yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "hiking", "ayurveda", "healing", "silent", "fasting"];
+  const foundActivities = activities.filter(act => message.toLowerCase().includes(act));
+  if (foundActivities.length > 0) {
+    preferences.activities = foundActivities.join(" ");
+  }
+  
+  return preferences;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -118,50 +142,56 @@ serve(async (req) => {
 
     console.log("Processing AI chat request with", messages.length, "messages");
 
-    // Extract the latest user query for search context
+    // Get the latest user message and extract preferences
     const lastUserMessage = messages.filter((m: any) => m.role === "user").pop();
     const userQuery = lastUserMessage?.content || "";
     
-    // Search for retreats based on user preferences
-    let retreatResults = "";
-    if (userQuery.toLowerCase().includes("retreat") || 
-        userQuery.toLowerCase().includes("yoga") || 
-        userQuery.toLowerCase().includes("wellness") ||
-        userQuery.toLowerCase().includes("travel") ||
-        userQuery.toLowerCase().includes("holiday") ||
-        userQuery.toLowerCase().includes("vacation") ||
-        userQuery.toLowerCase().includes("meditation") ||
-        userQuery.toLowerCase().includes("spiritual") ||
-        userQuery.toLowerCase().includes("surf") ||
-        userQuery.toLowerCase().includes("detox") ||
-        userQuery.toLowerCase().includes("budget") ||
-        userQuery.toLowerCase().includes("$") ||
-        messages.length > 1) {
-      retreatResults = await searchRetreats(userQuery);
+    // Combine all user messages to build complete preference picture
+    const allUserMessages = messages
+      .filter((m: any) => m.role === "user")
+      .map((m: any) => m.content)
+      .join(" ");
+    
+    const preferences = extractPreferences(allUserMessages);
+    console.log("Extracted preferences:", preferences);
+
+    // Search for real retreats based on preferences
+    let realRetreats = "";
+    if (userQuery.length > 3) {
+      realRetreats = await searchRealRetreats(userQuery, preferences);
     }
 
-    // Use fallback if search didn't return results
-    const retreatsData = retreatResults || FALLBACK_RETREATS;
+    const systemPrompt = `You are an expert retreat booking assistant for Retreats Holidays. You help users find their PERFECT retreat based on their specific preferences.
 
-    const systemPrompt = `You are a friendly and knowledgeable retreat booking assistant for Retreats Holidays.
-Your expertise is helping users find the perfect retreat or wellness holiday based on their preferences.
+YOUR MISSION: Find and recommend EXACTLY what the user wants. Every recommendation must match their stated preferences.
 
-AVAILABLE RETREATS FROM POPULAR PLATFORMS:
-${retreatsData}
+USER'S PREFERENCES FROM THIS CONVERSATION:
+${preferences.location ? `- Preferred Location: ${preferences.location}` : "- Location: Not specified yet"}
+${preferences.budget ? `- Budget: Under $${preferences.budget}` : "- Budget: Not specified yet"}
+${preferences.duration ? `- Duration: ${preferences.duration} days` : "- Duration: Not specified yet"}
+${preferences.activities ? `- Activities: ${preferences.activities}` : "- Activities: Not specified yet"}
 
-IMPORTANT GUIDELINES:
-- Always recommend at least 5 retreat options that match user preferences
-- Consider their budget, preferred activities, duration, and location preferences
-- Note that all prices shown include our 5% service fee
-- Be enthusiastic and helpful - you're helping them plan a transformative experience!
-- Provide specific details: name, location, price, duration, and key activities
-- If budget is mentioned, prioritize options within their range
-- Ask clarifying questions if needed: What activities interest them? Budget range? Preferred location/climate?
-- Mention which platform each retreat is from for credibility
-- For each recommendation, briefly explain why it's a good match for them
-- Keep responses conversational but informative
+${realRetreats ? `REAL RETREATS FOUND FROM POPULAR PLATFORMS:${realRetreats}` : ""}
 
-If they ask about something unrelated to retreats, gently guide them back to planning their perfect getaway.`;
+CRITICAL RULES:
+1. ALWAYS recommend at least 5 retreat options that MATCH the user's preferences
+2. If they specified a location, ALL recommendations must be in or near that location
+3. If they specified a budget, ALL recommendations must be within that budget
+4. If they specified activities, prioritize retreats offering those activities
+5. Include the 5% service fee in all prices you mention
+6. For each retreat, provide: Name, Location, Price (with fee), Duration, Key Activities
+7. Mention which platform each retreat is from (BookRetreats, RetreatGuru, etc.)
+8. Be enthusiastic but focused on their exact needs
+9. If preferences are unclear, ask ONE specific clarifying question
+
+FORMAT YOUR RECOMMENDATIONS CLEARLY:
+🏝️ **[Retreat Name]** - [Location]
+   💰 Price: $X USD (includes 5% service fee)
+   📅 Duration: X days
+   ✨ Activities: [list key activities]
+   📍 Source: [platform name]
+
+Keep responses helpful and focused on finding their perfect match!`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
