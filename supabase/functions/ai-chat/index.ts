@@ -126,7 +126,7 @@ async function searchCuratedRetreats(preferences: any): Promise<RetreatResult[]>
   }
 }
 
-// Search BookRetreats.com ONLY for specific individual retreat pages
+// Search BookRetreats.com for retreat listings
 async function searchBookRetreats(query: string, preferences: any): Promise<RetreatResult[]> {
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
   
@@ -136,19 +136,17 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
   }
 
   try {
-    // Build location-specific search
-    let locationQuery = preferences?.location || "";
+    // Build search query with location and preferences
     const searchTerms = [];
-    
-    if (preferences?.activities) searchTerms.push(preferences.activities);
+    if (preferences?.location) searchTerms.push(preferences.location);
+    searchTerms.push("yoga meditation retreat");
     if (preferences?.budget) searchTerms.push(`under $${preferences.budget}`);
-    if (preferences?.duration) searchTerms.push(`${preferences.duration} days`);
+    if (preferences?.activities) searchTerms.push(preferences.activities);
     
-    // Search specifically for individual retreat pages on bookretreats.com
-    // Use inurl:inmotion to target individual retreat pages which have /inmotion/ in URL
-    const fullQuery = `site:bookretreats.com/inmotion ${locationQuery} retreat ${searchTerms.join(" ")}`;
+    // Search bookretreats.com for retreat listings
+    const fullQuery = `site:bookretreats.com ${searchTerms.join(" ")}`;
 
-    console.log("Searching BookRetreats.com individual retreats:", fullQuery);
+    console.log("Searching BookRetreats.com:", fullQuery);
 
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
@@ -158,7 +156,7 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 15,
+        limit: 20,
         scrapeOptions: {
           formats: ["markdown"],
           onlyMainContent: true,
@@ -174,86 +172,50 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
     const data = await response.json();
     const results = data.data || [];
 
-    console.log("Found", results.length, "results from BookRetreats.com");
+    console.log("Found", results.length, "raw results from BookRetreats.com");
     
-    // Strictly filter to only individual retreat pages
+    // Filter results to find individual retreat pages
     const retreatPages = results.filter((result: any) => {
       const url = result.url || "";
       const title = (result.title || "").toLowerCase();
+      const content = result.markdown || result.description || "";
       
-      // MUST be an individual retreat page (contains /inmotion/)
-      if (!url.includes("/inmotion/")) {
-        console.log("Skipping non-retreat URL:", url);
+      // Skip category/listing pages
+      if (/\d+\s*best|\d+\s*top|best\s+\d+|top\s+\d+|compare|browse/i.test(title)) {
+        console.log("Skipping listing page:", title.substring(0, 50));
         return false;
       }
       
-      // Skip listing/category pages - these have patterns like "best", "top", numbers like "10 best"
-      if (/\d+\s*best|\d+\s*top|best\s+\d+|top\s+\d+/i.test(title)) {
-        console.log("Skipping listing page:", title);
-        return false;
-      }
-      if (title.includes("compare") || title.includes("browse") || title.includes("all retreats")) {
-        console.log("Skipping browse page:", title);
+      // Skip if title starts with a number (e.g., "30 Best Retreats")
+      if (/^(the\s+)?\d+\s/i.test(title)) {
+        console.log("Skipping numbered listing:", title.substring(0, 50));
         return false;
       }
       
-      // Skip if title indicates it's a listing (e.g., "30 Best Wellness Retreats")
-      if (/^\d+\s/.test(title) || /the\s+\d+\s+best/i.test(title)) {
-        console.log("Skipping numbered listing:", title);
-        return false;
-      }
+      // Must have price info OR be a specific retreat URL pattern
+      const hasPrice = /\$\s*\d{2,}|\d{3,}\s*(usd|dollars?|per\s*person)/i.test(content);
+      const hasSpecificUrl = /\/inmotion\/|\/retreat\/[a-z0-9-]+$/i.test(url);
+      const hasRetreatName = title.includes("retreat") && !title.includes("retreats in") && !title.includes("retreats for");
       
-      return true;
+      return hasPrice || hasSpecificUrl || hasRetreatName;
     });
 
     console.log("Filtered to", retreatPages.length, "individual retreat pages");
 
-    // If not enough individual pages found, do a second search with different terms
-    if (retreatPages.length < 5 && preferences?.location) {
-      console.log("Not enough results, trying broader search...");
-      const broaderQuery = `site:bookretreats.com/inmotion ${preferences.location} yoga meditation wellness`;
-      
-      const response2 = await fetch("https://api.firecrawl.dev/v1/search", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: broaderQuery,
-          limit: 15,
-          scrapeOptions: {
-            formats: ["markdown"],
-            onlyMainContent: true,
-          },
-        }),
-      });
-      
-      if (response2.ok) {
-        const data2 = await response2.json();
-        const results2 = (data2.data || []).filter((result: any) => {
-          const url = result.url || "";
-          const title = (result.title || "").toLowerCase();
-          if (!url.includes("/inmotion/")) return false;
-          if (/\d+\s*best|\d+\s*top|best\s+\d+|top\s+\d+/i.test(title)) return false;
-          if (/^\d+\s/.test(title) || /the\s+\d+\s+best/i.test(title)) return false;
-          return true;
-        });
-        
-        // Add new results that aren't duplicates
-        const existingUrls = new Set(retreatPages.map((r: any) => r.url));
-        for (const r of results2) {
-          if (!existingUrls.has(r.url)) {
-            retreatPages.push(r);
-          }
-        }
-        console.log("After broader search:", retreatPages.length, "total individual retreats");
-      }
-    }
-
-    return retreatPages.slice(0, 8).map((result: any, index: number) => 
+    const parsedRetreats = retreatPages.slice(0, 10).map((result: any, index: number) => 
       parseRetreatFromBookRetreats(result, index, preferences)
     );
+    
+    // Filter out any that still look like listing pages by name
+    const cleanRetreats = parsedRetreats.filter((r: RetreatResult) => {
+      const name = r.name.toLowerCase();
+      if (/^\d+\s|best\s+\d+|\d+\s+best|top\s+\d+|\d+\s+top/i.test(name)) return false;
+      if (name.includes("compare") || name.includes("browse") || name.includes("all retreats")) return false;
+      return true;
+    });
+    
+    console.log("Final clean retreats:", cleanRetreats.length);
+    return cleanRetreats.slice(0, 8);
   } catch (error) {
     console.error("Error searching BookRetreats.com:", error);
     return [];
@@ -444,24 +406,41 @@ serve(async (req) => {
       console.log("Not enough results, need more from external search");
     }
 
+    // Determine which sources have results
+    const hasCurated = curatedRetreats.length > 0;
+    const hasBookRetreats = bookRetreatsResults.length > 0;
+    
+    let sourceText = "";
+    if (hasCurated && hasBookRetreats) {
+      sourceText = "from our curated collection and BookRetreats.com";
+    } else if (hasCurated) {
+      sourceText = "from our curated collection";
+    } else if (hasBookRetreats) {
+      sourceText = "from BookRetreats.com";
+    }
+
     // Generate AI response
     const retreatContext = finalRetreats.map((r, i) => 
       `${i + 1}. ${r.name} - ${r.location}, ${r.country} - $${r.price} - ${r.duration} - Activities: ${r.activities.join(", ")} - Source: ${r.source}`
     ).join("\n");
 
-    const systemPrompt = `You are a friendly retreat booking assistant for "Retreats Holidays". You help users find wellness retreats from both our curated collection AND BookRetreats.com listings.
+    const systemPrompt = `You are a friendly retreat booking assistant for "Retreats Holidays". You help users find wellness retreats.
 
-Based on the user's preferences, you found these retreat options:
+${finalRetreats.length > 0 ? `Based on the user's preferences, you found these retreat options ${sourceText}:
 
 ${retreatContext}
 
 IMPORTANT INSTRUCTIONS:
 - Keep your response SHORT (2-3 sentences max)
 - Just introduce the retreats briefly - visual cards will show all details
-- Mention that you've searched both "our curated retreats" and "BookRetreats.com"
 - Be warm, helpful, and enthusiastic
-- If preferences are unclear, ask ONE clarifying question about location, budget, duration, or activities
-- Don't repeat retreat details that will be shown in cards`;
+- Don't repeat retreat details that will be shown in cards` : `You couldn't find any retreats matching the user's exact criteria.
+
+IMPORTANT INSTRUCTIONS:
+- Apologize briefly and ask the user to try different criteria
+- Suggest they try a different location, adjust their budget, or be more flexible with dates
+- Ask ONE clarifying question to help narrow down their preferences
+- Do NOT mention "curated collection" or "BookRetreats.com" since no results were found`}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
