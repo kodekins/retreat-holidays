@@ -139,14 +139,14 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
     // Build search query with location and preferences
     const searchTerms = [];
     if (preferences?.location) searchTerms.push(preferences.location);
-    searchTerms.push("yoga meditation retreat");
-    if (preferences?.budget) searchTerms.push(`under $${preferences.budget}`);
+    searchTerms.push("retreat");
     if (preferences?.activities) searchTerms.push(preferences.activities);
+    if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
     
-    // Search bookretreats.com for retreat listings
-    const fullQuery = `site:bookretreats.com ${searchTerms.join(" ")}`;
+    // Search bookretreats.com for individual retreat pages (URLs with /r/)
+    const fullQuery = `site:bookretreats.com/r/ ${searchTerms.join(" ")}`;
 
-    console.log("Searching BookRetreats.com:", fullQuery);
+    console.log("Searching BookRetreats.com individual retreats:", fullQuery);
 
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
@@ -156,7 +156,7 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 20,
+        limit: 15,
         scrapeOptions: {
           formats: ["markdown"],
           onlyMainContent: true,
@@ -174,48 +174,33 @@ async function searchBookRetreats(query: string, preferences: any): Promise<Retr
 
     console.log("Found", results.length, "raw results from BookRetreats.com");
     
-    // Filter results to find individual retreat pages
+    // Filter results to ONLY include individual retreat pages with /r/ in URL
     const retreatPages = results.filter((result: any) => {
       const url = result.url || "";
-      const title = (result.title || "").toLowerCase();
-      const content = result.markdown || result.description || "";
       
-      // Skip category/listing pages
-      if (/\d+\s*best|\d+\s*top|best\s+\d+|top\s+\d+|compare|browse/i.test(title)) {
-        console.log("Skipping listing page:", title.substring(0, 50));
+      // ONLY accept URLs with /r/ pattern (individual retreat pages)
+      if (!url.includes("/r/")) {
+        console.log("Skipping non-retreat URL:", url.substring(0, 60));
         return false;
       }
       
-      // Skip if title starts with a number (e.g., "30 Best Retreats")
-      if (/^(the\s+)?\d+\s/i.test(title)) {
-        console.log("Skipping numbered listing:", title.substring(0, 50));
+      // Skip search/listing pages
+      if (url.includes("/search") || url.includes("/s/") || url.includes("?")) {
+        console.log("Skipping search/listing URL:", url.substring(0, 60));
         return false;
       }
       
-      // Must have price info OR be a specific retreat URL pattern
-      const hasPrice = /\$\s*\d{2,}|\d{3,}\s*(usd|dollars?|per\s*person)/i.test(content);
-      const hasSpecificUrl = /\/inmotion\/|\/retreat\/[a-z0-9-]+$/i.test(url);
-      const hasRetreatName = title.includes("retreat") && !title.includes("retreats in") && !title.includes("retreats for");
-      
-      return hasPrice || hasSpecificUrl || hasRetreatName;
+      return true;
     });
 
-    console.log("Filtered to", retreatPages.length, "individual retreat pages");
+    console.log("Filtered to", retreatPages.length, "individual retreat pages with /r/");
 
-    const parsedRetreats = retreatPages.slice(0, 10).map((result: any, index: number) => 
+    const parsedRetreats = retreatPages.slice(0, 8).map((result: any, index: number) => 
       parseRetreatFromBookRetreats(result, index, preferences)
     );
     
-    // Filter out any that still look like listing pages by name
-    const cleanRetreats = parsedRetreats.filter((r: RetreatResult) => {
-      const name = r.name.toLowerCase();
-      if (/^\d+\s|best\s+\d+|\d+\s+best|top\s+\d+|\d+\s+top/i.test(name)) return false;
-      if (name.includes("compare") || name.includes("browse") || name.includes("all retreats")) return false;
-      return true;
-    });
-    
-    console.log("Final clean retreats:", cleanRetreats.length);
-    return cleanRetreats.slice(0, 8);
+    console.log("Final retreats:", parsedRetreats.length);
+    return parsedRetreats;
   } catch (error) {
     console.error("Error searching BookRetreats.com:", error);
     return [];
