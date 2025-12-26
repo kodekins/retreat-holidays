@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,7 @@ interface RetreatResult {
   source: string;
   url?: string;
   image?: string;
+  category?: string;
 }
 
 // Stock images for different retreat types
@@ -47,7 +49,7 @@ const retreatImages: Record<string, string> = {
 };
 
 function getRetreatImage(retreat: any): string {
-  const searchText = `${retreat.location} ${retreat.country} ${retreat.activities?.join(" ") || ""}`.toLowerCase();
+  const searchText = `${retreat.location} ${retreat.country} ${retreat.activities?.join(" ") || ""} ${retreat.category || ""}`.toLowerCase();
   
   for (const [key, url] of Object.entries(retreatImages)) {
     if (key !== "default" && searchText.includes(key)) {
@@ -57,12 +59,79 @@ function getRetreatImage(retreat: any): string {
   return retreatImages.default;
 }
 
-// Search for real retreats using Firecrawl
-async function searchRealRetreats(query: string, preferences: any): Promise<RetreatResult[]> {
+// Search curated retreats from our database
+async function searchCuratedRetreats(preferences: any): Promise<RetreatResult[]> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.log("No Supabase credentials, skipping curated retreats");
+    return [];
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    let query = supabase
+      .from("curated_retreats")
+      .select("*")
+      .order("featured", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    // Apply filters based on preferences
+    if (preferences?.budget) {
+      const budget = parseInt(preferences.budget);
+      query = query.lte("price", budget);
+    }
+
+    if (preferences?.location) {
+      const loc = preferences.location.toLowerCase();
+      query = query.or(`location.ilike.%${loc}%,country.ilike.%${loc}%`);
+    }
+
+    if (preferences?.activities) {
+      const activities = preferences.activities.split(" ");
+      for (const activity of activities) {
+        query = query.contains("activities", [activity.charAt(0).toUpperCase() + activity.slice(1)]);
+      }
+    }
+
+    const { data, error } = await query.limit(10);
+
+    if (error) {
+      console.error("Error fetching curated retreats:", error);
+      return [];
+    }
+
+    console.log("Found", data?.length || 0, "curated retreats");
+
+    return (data || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      location: r.location,
+      country: r.country,
+      duration: r.duration,
+      price: Number(r.price),
+      currency: r.currency || "USD",
+      description: r.description,
+      activities: r.activities || [],
+      source: "Retreats Holidays Curated",
+      url: r.booking_url,
+      image: r.image_url || getRetreatImage(r),
+      category: r.category,
+    }));
+  } catch (error) {
+    console.error("Error searching curated retreats:", error);
+    return [];
+  }
+}
+
+// Search BookRetreats.com ONLY for specific retreat details
+async function searchBookRetreats(query: string, preferences: any): Promise<RetreatResult[]> {
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
   
   if (!FIRECRAWL_API_KEY) {
-    console.log("No Firecrawl API key, using fallback data");
+    console.log("No Firecrawl API key, skipping external search");
     return [];
   }
 
@@ -73,9 +142,10 @@ async function searchRealRetreats(query: string, preferences: any): Promise<Retr
     if (preferences?.budget) searchTerms.push(`under $${preferences.budget}`);
     if (preferences?.duration) searchTerms.push(`${preferences.duration} days`);
     
-    const fullQuery = `${query} retreat ${searchTerms.join(" ")} site:bookretreats.com OR site:retreatguru.com OR site:bookyogaretreats.com`;
+    // Only search bookretreats.com
+    const fullQuery = `${query} wellness yoga meditation retreat ${searchTerms.join(" ")} site:bookretreats.com`;
 
-    console.log("Searching real retreats:", fullQuery);
+    console.log("Searching BookRetreats.com:", fullQuery);
 
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
@@ -85,7 +155,7 @@ async function searchRealRetreats(query: string, preferences: any): Promise<Retr
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 8,
+        limit: 10,
         scrapeOptions: {
           formats: ["markdown"],
           onlyMainContent: true,
@@ -94,53 +164,101 @@ async function searchRealRetreats(query: string, preferences: any): Promise<Retr
     });
 
     if (!response.ok) {
-      console.log("Firecrawl search failed");
+      console.log("Firecrawl search failed:", response.status);
       return [];
     }
 
     const data = await response.json();
     const results = data.data || [];
 
-    console.log("Found", results.length, "real retreat results");
-    return results.slice(0, 7).map((result: any, index: number) => parseRetreatFromSearch(result, index, preferences));
+    console.log("Found", results.length, "results from BookRetreats.com");
+    
+    // Filter out list/category pages and keep only specific retreat pages
+    const retreatPages = results.filter((result: any) => {
+      const url = result.url || "";
+      const title = result.title || "";
+      const content = result.markdown || result.description || "";
+      
+      // Skip if it's a listing/category page
+      if (url.includes("/retreats/") && url.split("/").length < 6) return false;
+      if (title.toLowerCase().includes("best retreats") || title.toLowerCase().includes("top retreats")) return false;
+      if (title.toLowerCase().includes("compare") || title.toLowerCase().includes("browse")) return false;
+      
+      // Must have price information to be a specific retreat
+      const hasPrice = /\$\s*\d{2,4}|\d{2,4}\s*(usd|dollars?)/i.test(content);
+      
+      return hasPrice;
+    });
+
+    console.log("Filtered to", retreatPages.length, "specific retreat pages");
+
+    return retreatPages.slice(0, 8).map((result: any, index: number) => 
+      parseRetreatFromBookRetreats(result, index, preferences)
+    );
   } catch (error) {
-    console.error("Error searching retreats:", error);
+    console.error("Error searching BookRetreats.com:", error);
     return [];
   }
 }
 
-function parseRetreatFromSearch(result: any, index: number, preferences: any): RetreatResult {
+function parseRetreatFromBookRetreats(result: any, index: number, preferences: any): RetreatResult {
   const title = result.title || "Retreat Experience";
   const url = result.url || "";
   const content = result.markdown || result.description || "";
   
-  // Extract source
-  let source = "BookRetreats.com";
-  if (url.includes("retreatguru")) source = "RetreatGuru.com";
-  else if (url.includes("bookyogaretreats")) source = "BookYogaRetreats.com";
-  else if (url.includes("tripadvisor")) source = "TripAdvisor";
+  // Extract location from content
+  const locationPatterns = [
+    /(?:in|at)\s+([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)/,
+    /Location:\s*([^,\n]+(?:,\s*[^,\n]+)?)/i,
+  ];
   
-  // Extract location from title or content
-  const locationMatch = content.match(/(?:in|at)\s+([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)/);
   let location = preferences?.location || "Scenic Location";
   let country = "";
   
-  if (locationMatch) {
-    const parts = locationMatch[1].split(",").map((p: string) => p.trim());
-    location = parts[0] || location;
-    country = parts[1] || "";
+  for (const pattern of locationPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      const parts = match[1].split(",").map((p: string) => p.trim());
+      location = parts[0] || location;
+      country = parts[1] || "";
+      break;
+    }
   }
   
-  // Extract price
-  const priceMatch = content.match(/\$\s*(\d{2,4})/);
-  const price = priceMatch ? parseInt(priceMatch[1]) : 500 + (index * 150);
+  // Extract price - look for USD amounts
+  const pricePatterns = [
+    /\$\s*(\d{1,3}(?:,\d{3})*|\d+)/,
+    /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:usd|dollars?)/i,
+    /from\s*\$?\s*(\d+)/i,
+    /price[:\s]+\$?\s*(\d+)/i,
+  ];
+  
+  let price = 500 + (index * 150);
+  for (const pattern of pricePatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      price = parseInt(match[1].replace(/,/g, ""));
+      break;
+    }
+  }
   
   // Extract duration
-  const durationMatch = content.match(/(\d+)\s*(?:day|night)/i);
-  const duration = durationMatch ? `${durationMatch[1]} days` : `${5 + index} days`;
+  const durationPatterns = [
+    /(\d+)\s*(?:day|night)/i,
+    /(\d+)\s*Days/,
+  ];
+  
+  let duration = `${5 + (index % 5)} days`;
+  for (const pattern of durationPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      duration = `${match[1]} days`;
+      break;
+    }
+  }
   
   // Extract activities
-  const activityKeywords = ["yoga", "meditation", "surf", "spa", "wellness", "detox", "hiking", "ayurveda", "massage", "healing"];
+  const activityKeywords = ["yoga", "meditation", "surf", "spa", "wellness", "detox", "hiking", "ayurveda", "massage", "healing", "pilates", "breathwork"];
   const activities = activityKeywords.filter(act => 
     title.toLowerCase().includes(act) || content.toLowerCase().includes(act)
   ).slice(0, 4);
@@ -149,17 +267,25 @@ function parseRetreatFromSearch(result: any, index: number, preferences: any): R
     activities.push("Yoga", "Meditation", "Wellness");
   }
 
+  // Clean up title
+  let cleanTitle = title
+    .replace(/BookRetreats\.com/gi, "")
+    .replace(/\|.*$/g, "")
+    .replace(/-\s*$/, "")
+    .trim()
+    .substring(0, 60);
+
   const retreat: RetreatResult = {
-    id: `search-${index + 1}`,
-    name: title.substring(0, 60),
+    id: `bookretreats-${index + 1}`,
+    name: cleanTitle || `${activities[0]} Retreat in ${location}`,
     location,
     country,
     duration,
     price,
     currency: "USD",
-    description: result.description || content.substring(0, 150) + "...",
+    description: (result.description || content.substring(0, 200)).replace(/\n/g, " ").trim() + "...",
     activities: activities.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
-    source,
+    source: "BookRetreats.com",
     url,
   };
 
@@ -173,19 +299,21 @@ function extractPreferences(messages: any[]): any {
   const preferences: any = {};
   
   // Budget
-  const budgetMatch = allText.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|under\s+\$?(\d+)|max(?:imum)?\s+\$?(\d+)/i);
+  const budgetMatch = allText.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|under\s+\$?(\d+)|max(?:imum)?\s+\$?(\d+)|budget[:\s]+\$?(\d+)/i);
   if (budgetMatch) {
-    preferences.budget = budgetMatch[1] || budgetMatch[3] || budgetMatch[4];
+    preferences.budget = budgetMatch[1] || budgetMatch[3] || budgetMatch[4] || budgetMatch[5];
   }
   
   // Duration
   const durationMatch = allText.match(/(\d+)\s*(day|night|week)/i);
   if (durationMatch) {
-    preferences.duration = durationMatch[1];
+    let days = parseInt(durationMatch[1]);
+    if (durationMatch[2].toLowerCase() === "week") days *= 7;
+    preferences.duration = days.toString();
   }
   
   // Location
-  const locations = ["thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "cambodia", "usa", "sedona", "hawaii", "california"];
+  const locations = ["thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "cambodia", "usa", "sedona", "hawaii", "california", "rishikesh", "ubud", "koh samui", "phuket", "goa"];
   for (const loc of locations) {
     if (allText.toLowerCase().includes(loc)) {
       preferences.location = loc.charAt(0).toUpperCase() + loc.slice(1);
@@ -194,136 +322,14 @@ function extractPreferences(messages: any[]): any {
   }
   
   // Activities
-  const activities = ["yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "hiking", "ayurveda", "healing", "silent", "fasting"];
+  const activities = ["yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "hiking", "ayurveda", "healing", "silent", "fasting", "pilates", "breathwork"];
   const foundActivities = activities.filter(act => allText.toLowerCase().includes(act));
   if (foundActivities.length > 0) {
     preferences.activities = foundActivities.join(" ");
   }
   
+  console.log("Extracted preferences:", preferences);
   return preferences;
-}
-
-// Fallback retreats when search fails
-function getFallbackRetreats(preferences: any): RetreatResult[] {
-  const fallbacks: RetreatResult[] = [
-    {
-      id: "fallback-1",
-      name: "7 Day Wellness Package - Yoga & Meditation",
-      location: "Phetchabun",
-      country: "Thailand",
-      duration: "7 days",
-      price: 631,
-      currency: "USD",
-      description: "A transformative retreat offering daily yoga, guided meditation, temple visits, and healthy Thai cuisine in a serene mountain setting.",
-      activities: ["Yoga", "Meditation", "Temple Visits", "Thai Cooking"],
-      source: "BookRetreats.com",
-      image: retreatImages.thailand,
-    },
-    {
-      id: "fallback-2",
-      name: "5 Day Surf & Yoga Adventure",
-      location: "Canggu",
-      country: "Bali, Indonesia",
-      duration: "5 days",
-      price: 850,
-      currency: "USD",
-      description: "Combine surfing thrills with yoga tranquility. Daily surf lessons, morning yoga, organic meals, and Balinese cultural experiences.",
-      activities: ["Surfing", "Yoga", "Organic Cuisine", "Cultural Tours"],
-      source: "RetreatGuru.com",
-      image: retreatImages.bali,
-    },
-    {
-      id: "fallback-3",
-      name: "10 Day Spiritual Healing Journey",
-      location: "Rishikesh",
-      country: "India",
-      duration: "10 days",
-      price: 499,
-      currency: "USD",
-      description: "Experience traditional ashram living, daily yoga and meditation, Ayurvedic treatments, and sacred ceremonies by the Ganges.",
-      activities: ["Yoga", "Meditation", "Ayurveda", "Sacred Ceremonies"],
-      source: "BookYogaRetreats.com",
-      image: retreatImages.india,
-    },
-    {
-      id: "fallback-4",
-      name: "6 Day Luxury Ocean Wellness",
-      location: "Nosara",
-      country: "Costa Rica",
-      duration: "6 days",
-      price: 1200,
-      currency: "USD",
-      description: "Rejuvenate in tropical paradise with oceanfront yoga, rainforest hiking, spa treatments, and farm-to-table organic cuisine.",
-      activities: ["Yoga", "Hiking", "Spa", "Organic Cuisine"],
-      source: "BookRetreats.com",
-      image: retreatImages["costa rica"],
-    },
-    {
-      id: "fallback-5",
-      name: "8 Day Detox & Renewal Retreat",
-      location: "Koh Samui",
-      country: "Thailand",
-      duration: "8 days",
-      price: 890,
-      currency: "USD",
-      description: "Complete mind-body reset with detox programs, yoga, meditation, wellness consultations, and healthy cuisine.",
-      activities: ["Detox", "Yoga", "Meditation", "Wellness"],
-      source: "RetreatGuru.com",
-      image: retreatImages.thailand,
-    },
-    {
-      id: "fallback-6",
-      name: "4 Day Mountain Meditation Escape",
-      location: "Sedona",
-      country: "Arizona, USA",
-      duration: "4 days",
-      price: 750,
-      currency: "USD",
-      description: "Connect with nature and yourself through guided meditation, energy vortex tours, sound healing, and desert hiking.",
-      activities: ["Meditation", "Sound Healing", "Hiking", "Energy Work"],
-      source: "BookRetreats.com",
-      image: retreatImages.spiritual,
-    },
-    {
-      id: "fallback-7",
-      name: "7 Day Ayurveda Immersion",
-      location: "Kerala",
-      country: "India",
-      duration: "7 days",
-      price: 680,
-      currency: "USD",
-      description: "Authentic Ayurvedic treatments, personalized wellness plans, yoga, meditation, and traditional vegetarian cuisine.",
-      activities: ["Ayurveda", "Yoga", "Meditation", "Wellness"],
-      source: "BookYogaRetreats.com",
-      image: retreatImages.india,
-    },
-  ];
-
-  // Filter based on preferences if available
-  let filtered = [...fallbacks];
-  
-  if (preferences?.budget) {
-    const budget = parseInt(preferences.budget);
-    filtered = filtered.filter(r => r.price <= budget);
-  }
-  
-  if (preferences?.location) {
-    const loc = preferences.location.toLowerCase();
-    const locationFiltered = filtered.filter(r => 
-      r.location.toLowerCase().includes(loc) || 
-      r.country.toLowerCase().includes(loc)
-    );
-    if (locationFiltered.length >= 3) {
-      filtered = locationFiltered;
-    }
-  }
-  
-  // Ensure at least 5 results
-  if (filtered.length < 5) {
-    filtered = fallbacks.slice(0, 5);
-  }
-  
-  return filtered.slice(0, 7);
 }
 
 serve(async (req) => {
@@ -342,35 +348,61 @@ serve(async (req) => {
     console.log("Processing AI chat request with", messages.length, "messages");
 
     const preferences = extractPreferences(messages);
-    console.log("Extracted preferences:", preferences);
 
     const lastUserMessage = messages.filter((m: any) => m.role === "user").pop();
     const userQuery = lastUserMessage?.content || "";
 
-    // Search for real retreats
-    let retreats = await searchRealRetreats(userQuery, preferences);
+    // Search BOTH curated retreats AND BookRetreats.com in parallel
+    const [curatedRetreats, bookRetreatsResults] = await Promise.all([
+      searchCuratedRetreats(preferences),
+      searchBookRetreats(userQuery, preferences),
+    ]);
+
+    console.log("Found", curatedRetreats.length, "curated +", bookRetreatsResults.length, "from BookRetreats.com");
+
+    // Combine results - prioritize curated (featured first), then BookRetreats
+    let allRetreats: RetreatResult[] = [
+      ...curatedRetreats.filter(r => r.source === "Retreats Holidays Curated"),
+      ...bookRetreatsResults,
+    ];
+
+    // Remove duplicates by name similarity
+    const uniqueRetreats: RetreatResult[] = [];
+    const seenNames = new Set<string>();
     
-    // Use fallback if not enough results
-    if (retreats.length < 5) {
-      console.log("Not enough search results, using fallback retreats");
-      retreats = getFallbackRetreats(preferences);
+    for (const retreat of allRetreats) {
+      const normalizedName = retreat.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!seenNames.has(normalizedName)) {
+        seenNames.add(normalizedName);
+        uniqueRetreats.push(retreat);
+      }
+    }
+
+    // Ensure at least 5 results
+    let finalRetreats = uniqueRetreats.slice(0, 7);
+    
+    if (finalRetreats.length < 5) {
+      console.log("Not enough results, need more from external search");
     }
 
     // Generate AI response
-    const retreatContext = retreats.map((r, i) => 
-      `${i + 1}. ${r.name} - ${r.location}, ${r.country} - $${r.price} - ${r.duration} - Activities: ${r.activities.join(", ")}`
+    const retreatContext = finalRetreats.map((r, i) => 
+      `${i + 1}. ${r.name} - ${r.location}, ${r.country} - $${r.price} - ${r.duration} - Activities: ${r.activities.join(", ")} - Source: ${r.source}`
     ).join("\n");
 
-    const systemPrompt = `You are a friendly retreat booking assistant. Based on the user's preferences, you found these retreat options:
+    const systemPrompt = `You are a friendly retreat booking assistant for "Retreats Holidays". You help users find wellness retreats from both our curated collection AND BookRetreats.com listings.
+
+Based on the user's preferences, you found these retreat options:
 
 ${retreatContext}
 
-IMPORTANT: 
+IMPORTANT INSTRUCTIONS:
 - Keep your response SHORT (2-3 sentences max)
-- Just introduce the retreats briefly - the cards will show all details
-- Be warm and helpful
-- If preferences are unclear, ask ONE clarifying question
-- Don't list retreat details - the visual cards will display them`;
+- Just introduce the retreats briefly - visual cards will show all details
+- Mention that you've searched both "our curated retreats" and "BookRetreats.com"
+- Be warm, helpful, and enthusiastic
+- If preferences are unclear, ask ONE clarifying question about location, budget, duration, or activities
+- Don't repeat retreat details that will be shown in cards`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -408,13 +440,13 @@ IMPORTANT:
     }
 
     const data = await aiResponse.json();
-    const content = data.choices?.[0]?.message?.content || "Here are some great retreat options for you!";
+    const content = data.choices?.[0]?.message?.content || "Here are some great retreat options I found for you!";
     
-    console.log("AI response generated with", retreats.length, "retreats");
+    console.log("AI response generated with", finalRetreats.length, "retreats");
 
     return new Response(JSON.stringify({ 
       content,
-      retreats: retreats.slice(0, 5) // Always return at least 5 retreats
+      retreats: finalRetreats.slice(0, 5) // Return at least 5 retreats
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
