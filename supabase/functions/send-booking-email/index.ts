@@ -26,7 +26,7 @@ serve(async (req) => {
 
   try {
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    const ADMIN_EMAIL = Deno.env.get("GMAIL_USER") || "admin@retreatsholidays.com";
+    const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || Deno.env.get("GMAIL_USER") || "admin@retreatsholidays.com";
 
     if (!RESEND_API_KEY) {
       console.error("RESEND_API_KEY not configured");
