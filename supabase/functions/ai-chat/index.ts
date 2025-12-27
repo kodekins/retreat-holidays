@@ -338,6 +338,47 @@ function extractPreferences(messages: any[]): any {
   return preferences;
 }
 
+// Detect user intent from the latest message
+function detectIntent(message: string): "greeting" | "search" | "question" | "need_info" {
+  const lowerMsg = message.toLowerCase().trim();
+  
+  // Greeting patterns
+  const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "hola", "namaste", "greetings"];
+  if (greetings.some(g => lowerMsg === g || lowerMsg.startsWith(g + " ") || lowerMsg.startsWith(g + ",") || lowerMsg.startsWith(g + "!"))) {
+    return "greeting";
+  }
+  
+  // Check if user is asking a question without search intent
+  const questionPatterns = ["what is", "what's", "how does", "can you", "do you", "tell me about", "explain"];
+  if (questionPatterns.some(q => lowerMsg.startsWith(q))) {
+    return "question";
+  }
+  
+  // Check if user provided enough details for a search
+  const hasLocation = ["thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "cambodia", "usa", "sedona", "hawaii", "california", "rishikesh", "ubud", "koh samui", "phuket", "goa"].some(loc => lowerMsg.includes(loc));
+  const hasActivity = ["yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "hiking", "ayurveda", "healing", "silent", "fasting", "pilates", "breathwork"].some(act => lowerMsg.includes(act));
+  const hasBudget = /\$\d+|budget|under|max/i.test(lowerMsg);
+  const hasDuration = /\d+\s*(day|night|week)/i.test(lowerMsg);
+  const hasSearchIntent = ["looking for", "find", "search", "show me", "recommend", "suggest", "want", "need", "book", "interested"].some(s => lowerMsg.includes(s));
+  
+  // If they have search intent AND at least one specific criterion, do search
+  if (hasSearchIntent && (hasLocation || hasActivity || hasBudget || hasDuration)) {
+    return "search";
+  }
+  
+  // If they just say vague things like "I want a retreat" without details
+  if (hasSearchIntent && !hasLocation && !hasActivity && !hasBudget && !hasDuration) {
+    return "need_info";
+  }
+  
+  // If they provide specific details even without explicit search words
+  if (hasLocation || hasActivity) {
+    return "search";
+  }
+  
+  return "need_info";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -353,93 +394,124 @@ serve(async (req) => {
 
     console.log("Processing AI chat request with", messages.length, "messages");
 
-    const preferences = extractPreferences(messages);
-
     const lastUserMessage = messages.filter((m: any) => m.role === "user").pop();
     const userQuery = lastUserMessage?.content || "";
-
-    // Search BOTH curated retreats AND BookRetreats.com in parallel
-    const [curatedRetreats, bookRetreatsResults] = await Promise.all([
-      searchCuratedRetreats(preferences),
-      searchBookRetreats(userQuery, preferences),
-    ]);
-
-    console.log("Found", curatedRetreats.length, "curated +", bookRetreatsResults.length, "from BookRetreats.com");
-
-    // Combine results - prioritize curated (featured first), then BookRetreats
-    let allRetreats: RetreatResult[] = [
-      ...curatedRetreats.filter(r => r.source === "Retreats Holidays Curated"),
-      ...bookRetreatsResults,
-    ];
-
-    // Remove duplicates by name similarity
-    const uniqueRetreats: RetreatResult[] = [];
-    const seenNames = new Set<string>();
     
-    for (const retreat of allRetreats) {
-      const normalizedName = retreat.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (!seenNames.has(normalizedName)) {
-        seenNames.add(normalizedName);
-        uniqueRetreats.push(retreat);
+    // Detect intent FIRST
+    const intent = detectIntent(userQuery);
+    console.log("Detected intent:", intent, "for message:", userQuery.substring(0, 50));
+
+    let finalRetreats: RetreatResult[] = [];
+    let sourceText = "";
+    
+    // Only search if intent is "search"
+    if (intent === "search") {
+      const preferences = extractPreferences(messages);
+
+      // Search BOTH curated retreats AND BookRetreats.com in parallel
+      const [curatedRetreats, bookRetreatsResults] = await Promise.all([
+        searchCuratedRetreats(preferences),
+        searchBookRetreats(userQuery, preferences),
+      ]);
+
+      console.log("Found", curatedRetreats.length, "curated +", bookRetreatsResults.length, "from BookRetreats.com");
+
+      // Combine results - prioritize curated (featured first), then BookRetreats
+      let allRetreats: RetreatResult[] = [
+        ...curatedRetreats.filter(r => r.source === "Retreats Holidays Curated"),
+        ...bookRetreatsResults,
+      ];
+
+      // Remove duplicates by name similarity
+      const uniqueRetreats: RetreatResult[] = [];
+      const seenNames = new Set<string>();
+      
+      for (const retreat of allRetreats) {
+        const normalizedName = retreat.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (!seenNames.has(normalizedName)) {
+          seenNames.add(normalizedName);
+          uniqueRetreats.push(retreat);
+        }
+      }
+
+      finalRetreats = uniqueRetreats.slice(0, 7);
+
+      // Determine which sources have results
+      const hasCurated = curatedRetreats.length > 0;
+      const hasBookRetreats = bookRetreatsResults.length > 0;
+      
+      if (hasCurated && hasBookRetreats) {
+        sourceText = "from our curated collection and BookRetreats.com";
+      } else if (hasCurated) {
+        sourceText = "from our curated collection";
+      } else if (hasBookRetreats) {
+        sourceText = "from BookRetreats.com";
       }
     }
 
-    // Ensure at least 5 results
-    let finalRetreats = uniqueRetreats.slice(0, 7);
-    
-    if (finalRetreats.length < 5) {
-      console.log("Not enough results, need more from external search");
-    }
-
-    // Determine which sources have results
-    const hasCurated = curatedRetreats.length > 0;
-    const hasBookRetreats = bookRetreatsResults.length > 0;
-    
-    let sourceText = "";
-    if (hasCurated && hasBookRetreats) {
-      sourceText = "from our curated collection and BookRetreats.com";
-    } else if (hasCurated) {
-      sourceText = "from our curated collection";
-    } else if (hasBookRetreats) {
-      sourceText = "from BookRetreats.com";
-    }
-
-    // Generate AI response with human sales rep personality
-    const retreatContext = finalRetreats.map((r, i) => 
+    // Build context for retreats only if we searched
+    const retreatContext = finalRetreats.length > 0 ? finalRetreats.map((r, i) => 
       `${i + 1}. ${r.name} - ${r.location}, ${r.country} - $${r.price} - ${r.duration} - Activities: ${r.activities.join(", ")} - Source: ${r.source}`
-    ).join("\n");
+    ).join("\n") : "";
 
-    const systemPrompt = `You are Sarah, a warm and experienced retreat specialist at "Retreats Holidays". You've personally visited many retreats and genuinely care about helping people find their perfect wellness experience.
+    // Build system prompt based on intent
+    let systemPrompt = `You are Sarah, a warm and experienced retreat specialist at "Retreats Holidays". You've personally visited many retreats and genuinely care about helping people find their perfect wellness experience.
 
 YOUR PERSONALITY:
 - Friendly, warm, and conversational - like talking to a helpful friend
 - Empathetic - acknowledge their feelings and needs
 - Knowledgeable but not pushy - you suggest, don't sell aggressively  
-- Use casual, natural language (contractions, expressions like "I'd love to", "That sounds amazing!")
+- Use casual, natural language (contractions, expressions like "I'd love to help!", "That sounds amazing!")
 - Ask thoughtful follow-up questions to understand their needs better
-- Share brief personal anecdotes when relevant ("I actually visited a retreat in Bali last year...")
 
-CONVERSATION STYLE:
-- Start by acknowledging what they said and showing genuine interest
-- If they're vague, ask 1-2 clarifying questions before showing options
-- When showing retreats, give a brief personal recommendation ("Based on what you've shared, I think you'd really love...")
-- Always mention they can click "Book Now" to reserve or "WhatsApp" to chat more with the team
+`;
 
-${finalRetreats.length > 0 ? `You found these retreat options ${sourceText}:
+    if (intent === "greeting") {
+      systemPrompt += `CURRENT SITUATION: The user just greeted you.
 
+INSTRUCTIONS:
+- Warmly greet them back with genuine enthusiasm
+- Briefly introduce yourself as their retreat specialist
+- Ask what kind of retreat experience they're dreaming of
+- Keep it SHORT (2-3 sentences max)
+- DO NOT show any retreat results - just have a friendly conversation first
+- Ask about: destination preferences, type of experience (yoga, wellness, adventure), budget, duration`;
+    } else if (intent === "need_info") {
+      systemPrompt += `CURRENT SITUATION: The user wants to find a retreat but hasn't given enough details yet.
+
+INSTRUCTIONS:
+- Acknowledge their interest warmly
+- Ask 1-2 specific questions to understand what they're looking for
+- Questions to consider: Where would they like to go? What type of retreat (yoga, meditation, wellness, adventure)? How long? Any budget in mind?
+- Keep it conversational and SHORT (2-3 sentences)
+- DO NOT show any retreat results yet - gather info first`;
+    } else if (intent === "question") {
+      systemPrompt += `CURRENT SITUATION: The user is asking a general question.
+
+INSTRUCTIONS:
+- Answer their question helpfully
+- If relevant, tie it back to how you can help them find the perfect retreat
+- Keep it conversational and SHORT`;
+    } else if (intent === "search" && finalRetreats.length > 0) {
+      systemPrompt += `CURRENT SITUATION: You searched and found retreat options ${sourceText}.
+
+AVAILABLE RETREATS:
 ${retreatContext}
 
-IMPORTANT:
-- Keep responses SHORT (2-3 sentences) - the retreat cards show all details
-- Give a warm, personal intro to the options
-- Mention your favorite or best match for them
-- Invite them to click "Book Now" or "WhatsApp" for more info` : `You couldn't find retreats matching their exact criteria.
+INSTRUCTIONS:
+- Give a warm, personal intro to the options (1-2 sentences)
+- Mention your top pick or best match for them
+- Tell them they can click "Book Now" to reserve or "WhatsApp" to learn more
+- Keep it SHORT - the retreat cards show all the details`;
+    } else if (intent === "search" && finalRetreats.length === 0) {
+      systemPrompt += `CURRENT SITUATION: You searched but couldn't find retreats matching their exact criteria.
 
-IMPORTANT:
-- Be understanding and supportive ("I hear you...")  
-- Suggest adjusting criteria gently
+INSTRUCTIONS:
+- Be understanding and supportive
+- Suggest adjusting one criterion (different location, dates, or activity type)
 - Ask ONE helpful question to find alternatives
-- Stay positive and helpful`}`;
+- Stay positive and helpful`;
+    }
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
