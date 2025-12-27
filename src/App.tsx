@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import TravelGuideLogin from "./pages/TravelGuideLogin";
 import TravelGuideDashboard from "./pages/TravelGuideDashboard";
+import Retreats from "./pages/Retreats";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/retreats" element={<Retreats />} />
           <Route path="/travel-guide" element={<TravelGuideLogin />} />
           <Route path="/travel-guide/dashboard" element={<TravelGuideDashboard />} />
           <Route path="*" element={<NotFound />} />
