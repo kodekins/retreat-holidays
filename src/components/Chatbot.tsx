@@ -39,7 +39,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Hello! I'm your Retreats Holidays assistant. Tell me what kind of retreat you're looking for - your preferred location, budget, activities, and duration - and I'll find the perfect options for you!",
+      content: "Hey there! 👋 I'm Sarah, your personal retreat specialist. I've helped hundreds of people find their perfect wellness getaway. What's bringing you to look for a retreat today? Whether you need to destress, reconnect with yourself, or just want an adventure - I'm here to help!",
       timestamp: new Date(),
     },
   ]);
@@ -171,7 +171,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {
         id: '1',
         role: 'assistant',
-        content: "Hello! I'm your Retreats Holidays assistant. Tell me what kind of retreat you're looking for - yoga, meditation, surf, wellness - and I'll find the perfect match for you!",
+        content: "Hey there! 👋 I'm Sarah, your personal retreat specialist. I've helped hundreds of people find their perfect wellness getaway. What's bringing you to look for a retreat today? Whether you need to destress, reconnect with yourself, or just want an adventure - I'm here to help!",
         timestamp: new Date(),
       },
     ]);
@@ -185,12 +185,16 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/30">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-            <Droplet className="w-5 h-5 text-primary" />
+          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
+            <img 
+              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" 
+              alt="Sarah"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground text-sm">Retreats Holidays</h3>
-            <p className="text-xs text-muted-foreground">Your personal assistant</p>
+            <h3 className="font-semibold text-foreground text-sm">Sarah</h3>
+            <p className="text-xs text-muted-foreground">Your Retreat Specialist</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
