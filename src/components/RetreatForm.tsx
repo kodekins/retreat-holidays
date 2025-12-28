@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, X } from 'lucide-react';
+import { Loader2, ArrowLeft, X, Upload, Image as ImageIcon, Link } from 'lucide-react';
 
 interface RetreatFormProps {
   retreat?: any;
@@ -50,6 +50,10 @@ const ACTIVITIES = [
 const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageSource, setImageSource] = useState<'url' | 'upload'>('url');
+  const [imagePreview, setImagePreview] = useState<string | null>(retreat?.image_url || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     name: retreat?.name || '',
@@ -71,6 +75,9 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'image_url' && value) {
+      setImagePreview(value);
+    }
   };
 
   const toggleActivity = (activity: string) => {
@@ -79,6 +86,79 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
       handleChange('activities', current.filter((a: string) => a !== activity));
     } else {
       handleChange('activities', [...current, activity]);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload an image file (JPEG, PNG, etc.)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload an image smaller than 5MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Create unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      // Upload to storage
+      const { data, error } = await supabase.storage
+        .from('retreat-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('retreat-images')
+        .getPublicUrl(fileName);
+
+      handleChange('image_url', publicUrl);
+      setImagePreview(publicUrl);
+      
+      toast({
+        title: 'Image uploaded',
+        description: 'Your image has been uploaded successfully.',
+      });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload image. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    handleChange('image_url', '');
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -328,18 +408,107 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
               <CardTitle>Media & Links</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => handleChange('image_url', e.target.value)}
-                  placeholder="https://..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Provide a URL to an image of your retreat
-                </p>
+              {/* Image Upload Section */}
+              <div className="space-y-3">
+                <Label>Retreat Image</Label>
+                
+                {/* Toggle between URL and Upload */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={imageSource === 'url' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setImageSource('url')}
+                    className="gap-2"
+                  >
+                    <Link className="w-4 h-4" />
+                    URL
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={imageSource === 'upload' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setImageSource('upload')}
+                    className="gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload
+                  </Button>
+                </div>
+
+                {imageSource === 'url' ? (
+                  <div className="space-y-2">
+                    <Input
+                      id="image_url"
+                      type="url"
+                      value={formData.image_url}
+                      onChange={(e) => handleChange('image_url', e.target.value)}
+                      placeholder="https://example.com/image.jpg"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Provide a URL to an image of your retreat
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="w-full h-24 border-dashed gap-2"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5" />
+                          Click to upload image
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Max file size: 5MB. Supported formats: JPEG, PNG, WebP
+                    </p>
+                  </div>
+                )}
+
+                {/* Image Preview */}
+                {imagePreview && (
+                  <div className="relative mt-3">
+                    <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
+                      <img
+                        src={imagePreview}
+                        alt="Retreat preview"
+                        className="w-full h-full object-cover"
+                        onError={() => setImagePreview(null)}
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={removeImage}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                      {formData.image_url}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
