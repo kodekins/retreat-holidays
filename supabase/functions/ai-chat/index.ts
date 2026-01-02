@@ -601,20 +601,37 @@ serve(async (req) => {
       const preferences = extractPreferences(messages);
       const isHolidaySearch = preferences.tripType === "holiday" || 
         userQuery.toLowerCase().includes("holiday") || 
-        userQuery.toLowerCase().includes("vacation");
-
-      // Search in parallel
-      const searchPromises: Promise<TravelResult[]>[] = [
-        searchCuratedRetreats(preferences),
-        searchRetreatSites(userQuery, preferences),
-      ];
+        userQuery.toLowerCase().includes("vacation") ||
+        userQuery.toLowerCase().includes("trip") ||
+        userQuery.toLowerCase().includes("travel");
       
-      // Add holiday search if relevant
+      const isRetreatSearch = preferences.tripType === "retreat" || 
+        userQuery.toLowerCase().includes("retreat") || 
+        userQuery.toLowerCase().includes("yoga") ||
+        userQuery.toLowerCase().includes("meditation") ||
+        userQuery.toLowerCase().includes("wellness");
+
+      // Search in parallel based on what user wants
+      const searchPromises: Promise<TravelResult[]>[] = [];
+      
+      // Always search curated retreats
+      searchPromises.push(searchCuratedRetreats(preferences));
+      
+      // Search retreats if relevant or if neither is specified
+      if (isRetreatSearch || (!isHolidaySearch && !isRetreatSearch)) {
+        searchPromises.push(searchRetreatSites(userQuery, preferences));
+      } else {
+        searchPromises.push(Promise.resolve([]));
+      }
+      
+      // Search holidays if relevant
       if (isHolidaySearch) {
         searchPromises.push(searchHolidaySites(userQuery, preferences));
+      } else {
+        searchPromises.push(Promise.resolve([]));
       }
 
-      const [curatedRetreats, retreatResults, holidayResults = []] = await Promise.all(searchPromises);
+      const [curatedRetreats, retreatResults, holidayResults] = await Promise.all(searchPromises);
 
       console.log("Found:", curatedRetreats.length, "curated,", retreatResults.length, "retreats,", holidayResults.length, "holidays");
 
@@ -668,39 +685,38 @@ CAPABILITIES:
     if (intent === "greeting") {
       systemPrompt += `SITUATION: User just greeted you.
 
-RESPONSE: Warmly greet them back. Briefly introduce yourself. Ask what they're looking for - a retreat, holiday, or just travel advice? Keep it short (2-3 sentences).`;
+RESPONSE: Warmly greet them. Ask what kind of trip they're looking for (retreat or holiday). Max 2 sentences.`;
 
     } else if (intent === "general") {
       systemPrompt += `SITUATION: User asking a general/daily life question.
 
-RESPONSE: Answer their question naturally and helpfully. If relevant, mention you can also help with travel planning. Be conversational.`;
+RESPONSE: Answer briefly and naturally. Max 2-3 sentences.`;
 
     } else if (intent === "question") {
       systemPrompt += `SITUATION: User asking an informational question.
 
-RESPONSE: Answer their question accurately and concisely. If travel-related, offer to help them search for options.`;
+RESPONSE: Answer concisely. Max 2-3 sentences.`;
 
     } else if (intent === "need_info") {
       systemPrompt += `SITUATION: User wants to find something but hasn't given enough details.
 
-RESPONSE: Acknowledge their interest warmly. Ask 1-2 specific questions: Where would they like to go? What type of experience (retreat, beach holiday, adventure)? Any budget or duration preferences? Keep it conversational.`;
+RESPONSE: Ask 1 quick question about their destination preference. Keep it to 1-2 sentences.`;
 
     } else if (intent === "search" && finalResults.length > 0) {
-      systemPrompt += `SITUATION: Found travel options ${sourceText}.
+      const resultType = finalResults[0]?.type === "holiday" ? "holiday options" : "retreats";
+      systemPrompt += `SITUATION: Found ${finalResults.length} ${resultType} ${sourceText}.
 
-RESULTS:
-${resultContext}
-
-RESPONSE: 
-- Brief, warm intro (1 sentence)
-- Highlight your top recommendation and why it matches their needs
-- Mention they can click "Book Now" or "WhatsApp" for more info
-- Keep it short - the cards show the details!`;
+CRITICAL INSTRUCTIONS:
+- Say ONLY: "Here are some ${resultType} I found for you! Take a look below 👇"
+- Do NOT describe the options - the cards will show all details
+- Do NOT mention prices, locations, or durations in text
+- Keep response under 15 words
+- The cards are displayed automatically below your message`;
 
     } else if (intent === "search" && finalResults.length === 0) {
       systemPrompt += `SITUATION: Searched but found no exact matches.
 
-RESPONSE: Be understanding. Suggest adjusting one criterion (location, dates, or type). Ask a helpful follow-up question. Stay positive.`;
+RESPONSE: Apologize briefly. Suggest trying a different location or type. Max 2 sentences.`;
     }
 
     // Call AI
