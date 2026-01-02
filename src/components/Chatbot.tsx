@@ -39,7 +39,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Hey there! 👋 I'm Sarah, your personal retreat specialist. I've helped hundreds of people find their perfect wellness getaway. What's bringing you to look for a retreat today? Whether you need to destress, reconnect with yourself, or just want an adventure - I'm here to help!",
+      content: "Hey there! 👋 I'm Sarah, your personal travel specialist. Whether you're looking for a peaceful yoga retreat, an adventurous holiday, or just need travel advice - I'm here to help! What kind of experience are you dreaming of?",
       timestamp: new Date(),
     },
   ]);
@@ -171,7 +171,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {
         id: '1',
         role: 'assistant',
-        content: "Hey there! 👋 I'm Sarah, your personal retreat specialist. I've helped hundreds of people find their perfect wellness getaway. What's bringing you to look for a retreat today? Whether you need to destress, reconnect with yourself, or just want an adventure - I'm here to help!",
+        content: "Hey there! 👋 I'm Sarah, your personal travel specialist. Whether you're looking for a peaceful yoga retreat, an adventurous holiday, or just need travel advice - I'm here to help! What kind of experience are you dreaming of?",
         timestamp: new Date(),
       },
     ]);
@@ -194,7 +194,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
           </div>
           <div>
             <h3 className="font-semibold text-foreground text-sm">Sarah</h3>
-            <p className="text-xs text-muted-foreground">Your Retreat Specialist</p>
+            <p className="text-xs text-muted-foreground">Travel Specialist</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -233,7 +233,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
                 {message.retreats && message.retreats.length > 0 && (
                   <div className="space-y-3 mt-2">
                     <p className="text-xs text-muted-foreground font-medium">
-                      Found {message.retreats.length} retreats matching your preferences:
+                      Found {message.retreats.length} options for you:
                     </p>
                     {message.retreats.slice(0, 5).map((retreat) => (
                       <RetreatCard
