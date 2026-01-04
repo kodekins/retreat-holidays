@@ -1,10 +1,11 @@
-import { X, RefreshCw, Send, Loader2, Droplet } from 'lucide-react';
+import { X, RefreshCw, Send, Loader2, Mic, MicOff } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Retreat } from '@/types/retreat';
 import RetreatCard from './RetreatCard';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -48,6 +49,23 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, toggleListening } = useVoiceInput({
+    onTranscript: (text) => {
+      setInput(text);
+      // Auto-send after voice input
+      setTimeout(() => {
+        handleSendMessage(text);
+      }, 100);
+    },
+    onError: (error) => {
+      toast({
+        title: "Voice Input Error",
+        description: error,
+        variant: "destructive",
+      });
+    },
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -232,7 +250,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
                 </div>
                 {message.retreats && message.retreats.length > 0 && (
                   <div className="space-y-3 mt-2">
-                    {message.retreats.slice(0, 3).map((retreat) => (
+                    {message.retreats.slice(0, 10).map((retreat) => (
                       <RetreatCard
                         key={retreat.id}
                         retreat={retreat}
@@ -262,24 +280,41 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {/* Input */}
       <div className="p-4 border-t border-border bg-secondary/20">
         <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-4 py-2">
+          <button
+            onClick={toggleListening}
+            disabled={isLoading}
+            className={`p-2 rounded-full transition-all ${
+              isListening 
+                ? 'bg-red-500 text-white animate-pulse' 
+                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            aria-label={isListening ? "Stop listening" : "Start voice input"}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
+            placeholder={isListening ? "Listening..." : "Type or speak your message..."}
             className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-            disabled={isLoading}
+            disabled={isLoading || isListening}
           />
           <button
             onClick={() => handleSendMessage()}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isListening}
             className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
+        {isListening && (
+          <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse">
+            🎤 Listening... Speak your travel preferences
+          </p>
+        )}
       </div>
     </div>
   );
