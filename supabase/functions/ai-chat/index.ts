@@ -23,63 +23,35 @@ interface TravelResult {
   type: "retreat" | "holiday" | "experience";
 }
 
-// High-quality images for different types
-const travelImages: Record<string, string> = {
-  // Locations
+// Fallback images when no image found
+const fallbackImages: Record<string, string> = {
   thailand: "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=800&q=80",
   bali: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80",
-  indonesia: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&q=80",
   india: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&q=80",
   "costa rica": "https://images.unsplash.com/photo-1518259102261-b40117eabbc9?w=800&q=80",
   mexico: "https://images.unsplash.com/photo-1518105779142-d975f22f1b0a?w=800&q=80",
   portugal: "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=800&q=80",
   spain: "https://images.unsplash.com/photo-1543783207-ec64e4d95325?w=800&q=80",
   greece: "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&q=80",
-  "sri lanka": "https://images.unsplash.com/photo-1586613835341-f2be7e67f0b5?w=800&q=80",
-  nepal: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&q=80",
-  peru: "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=800&q=80",
-  egypt: "https://images.unsplash.com/photo-1539768942893-daf53e448371?w=800&q=80",
-  morocco: "https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?w=800&q=80",
-  vietnam: "https://images.unsplash.com/photo-1528127269322-539801943592?w=800&q=80",
   maldives: "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800&q=80",
   dubai: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800&q=80",
-  hawaii: "https://images.unsplash.com/photo-1507876466758-bc54f384809c?w=800&q=80",
   italy: "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800&q=80",
   france: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80",
   japan: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80",
-  australia: "https://images.unsplash.com/photo-1523482580672-f109ba8cb9be?w=800&q=80",
-  caribbean: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80",
-  switzerland: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80",
-  // Activities
   yoga: "https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80",
   meditation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80",
-  surf: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800&q=80",
   wellness: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&q=80",
-  detox: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80",
-  spiritual: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
   beach: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
   adventure: "https://images.unsplash.com/photo-1530789253388-582c481c54b0?w=800&q=80",
-  safari: "https://images.unsplash.com/photo-1516426122078-c23e76319801?w=800&q=80",
-  cruise: "https://images.unsplash.com/photo-1548574505-5e239809ee19?w=800&q=80",
-  ski: "https://images.unsplash.com/photo-1551524559-8af4e6624178?w=800&q=80",
-  city: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80",
-  romantic: "https://images.unsplash.com/photo-1529290130-4ca3753253ae?w=800&q=80",
-  honeymoon: "https://images.unsplash.com/photo-1529290130-4ca3753253ae?w=800&q=80",
-  family: "https://images.unsplash.com/photo-1602002418816-5c0aeef426aa?w=800&q=80",
-  luxury: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
-  spa: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&q=80",
   default: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80",
 };
 
-function getTravelImage(item: any): string {
-  const searchText = `${item.location || ""} ${item.country || ""} ${item.activities?.join(" ") || ""} ${item.category || ""} ${item.name || ""}`.toLowerCase();
-  
-  for (const [key, url] of Object.entries(travelImages)) {
-    if (key !== "default" && searchText.includes(key)) {
-      return url;
-    }
+function getFallbackImage(item: any): string {
+  const text = `${item.location || ""} ${item.country || ""} ${item.activities?.join(" ") || ""} ${item.name || ""}`.toLowerCase();
+  for (const [key, url] of Object.entries(fallbackImages)) {
+    if (key !== "default" && text.includes(key)) return url;
   }
-  return travelImages.default;
+  return fallbackImages.default;
 }
 
 // Search curated retreats from database
@@ -87,10 +59,7 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   
-  if (!supabaseUrl || !supabaseKey) {
-    console.log("No Supabase credentials");
-    return [];
-  }
+  if (!supabaseUrl || !supabaseKey) return [];
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -98,34 +67,22 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
     let query = supabase
       .from("curated_retreats")
       .select("*")
-      .order("featured", { ascending: false })
-      .order("created_at", { ascending: false });
+      .order("featured", { ascending: false });
 
     if (preferences?.budget) {
-      const budget = parseInt(preferences.budget);
-      query = query.lte("price", budget);
+      query = query.lte("price", parseInt(preferences.budget));
     }
-
     if (preferences?.location) {
       const loc = preferences.location.toLowerCase();
       query = query.or(`location.ilike.%${loc}%,country.ilike.%${loc}%`);
     }
 
-    if (preferences?.activities) {
-      const activities = preferences.activities.split(" ");
-      for (const activity of activities) {
-        query = query.contains("activities", [activity.charAt(0).toUpperCase() + activity.slice(1)]);
-      }
-    }
-
-    const { data, error } = await query.limit(10);
+    const { data, error } = await query.limit(5);
 
     if (error) {
       console.error("Curated retreats error:", error);
       return [];
     }
-
-    console.log("Found", data?.length || 0, "curated retreats");
 
     return (data || []).map((r: any) => ({
       id: r.id,
@@ -139,40 +96,300 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
       activities: r.activities || [],
       source: "Curated Collection",
       url: r.booking_url,
-      image: r.image_url || getTravelImage(r),
+      image: r.image_url || getFallbackImage(r),
       category: r.category,
       type: "retreat" as const,
     }));
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Curated search error:", error);
     return [];
   }
 }
 
-// Search retreat websites using Firecrawl
-async function searchRetreatSites(query: string, preferences: any): Promise<TravelResult[]> {
-  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-  
-  if (!FIRECRAWL_API_KEY) {
-    console.log("No Firecrawl API key");
-    return [];
-  }
+// Scrape and extract details from a single retreat page
+async function scrapeRetreatPage(url: string, apiKey: string): Promise<TravelResult | null> {
+  try {
+    console.log("Scraping retreat page:", url);
+    
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["markdown", "html"],
+        onlyMainContent: true,
+      }),
+    });
 
-  const results: TravelResult[] = [];
+    if (!response.ok) {
+      console.log("Scrape failed:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const markdown = data.data?.markdown || "";
+    const metadata = data.data?.metadata || {};
+    
+    if (!markdown || markdown.length < 100) return null;
+
+    // Extract retreat name from title or content
+    let name = metadata.title || "";
+    name = name.replace(/\s*[-|].*$/, "").replace(/BookRetreats|BookYogaRetreats/gi, "").trim();
+    if (!name || name.length < 5) {
+      const headingMatch = markdown.match(/^#\s*(.+?)[\n\r]/m);
+      name = headingMatch ? headingMatch[1].trim() : "Wellness Retreat";
+    }
+    name = name.substring(0, 80);
+
+    // Extract price - look for various patterns
+    let price = 0;
+    const pricePatterns = [
+      /From\s*\$\s*(\d{1,3}(?:,\d{3})*|\d+)/i,
+      /\$\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:USD|per person)?/i,
+      /Price[:\s]+\$?\s*(\d{1,3}(?:,\d{3})*|\d+)/i,
+      /Starting\s+(?:at|from)\s*\$?\s*(\d+)/i,
+      /USD\s*(\d{1,3}(?:,\d{3})*|\d+)/i,
+      /(\d{1,3}(?:,\d{3})*)\s*USD/i,
+    ];
+    for (const pattern of pricePatterns) {
+      const match = markdown.match(pattern);
+      if (match) {
+        price = parseInt(match[1].replace(/,/g, ""));
+        if (price > 50 && price < 50000) break;
+        price = 0;
+      }
+    }
+    if (price === 0) price = 899; // Default if not found
+
+    // Extract location and country
+    let location = "";
+    let country = "";
+    const locationPatterns = [
+      /(?:Location|Where)[:\s]+([^,\n]+),\s*([^,\n]+)/i,
+      /(?:in|at)\s+([A-Z][a-zA-Z\s]+),\s*([A-Z][a-zA-Z\s]+)/,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*(Thailand|Bali|Indonesia|India|Costa Rica|Mexico|Portugal|Spain|Greece|Sri Lanka|Nepal|Peru|Vietnam|Cambodia)/i,
+    ];
+    for (const pattern of locationPatterns) {
+      const match = markdown.match(pattern);
+      if (match) {
+        location = match[1].trim();
+        country = match[2].trim();
+        break;
+      }
+    }
+    // Try to extract country from URL or content
+    const countries = ["Thailand", "Bali", "Indonesia", "India", "Costa Rica", "Mexico", "Portugal", "Spain", "Greece", "Sri Lanka", "Nepal", "Peru", "Vietnam", "Cambodia", "Maldives", "Hawaii", "Italy", "France", "Japan"];
+    if (!country) {
+      for (const c of countries) {
+        if (url.toLowerCase().includes(c.toLowerCase()) || markdown.toLowerCase().includes(c.toLowerCase())) {
+          country = c;
+          break;
+        }
+      }
+    }
+    if (!location) location = country || "Scenic Location";
+
+    // Extract duration
+    let duration = "7 days";
+    const durationPatterns = [
+      /(\d+)\s*(?:Day|Night)s?\s*(?:\/\s*\d+\s*(?:Day|Night)s?)?/i,
+      /Duration[:\s]+(\d+)\s*(?:day|night)/i,
+    ];
+    for (const pattern of durationPatterns) {
+      const match = markdown.match(pattern);
+      if (match) {
+        duration = `${match[1]} days`;
+        break;
+      }
+    }
+
+    // Extract activities
+    const activityKeywords = ["yoga", "meditation", "spa", "massage", "detox", "wellness", "healing", "ayurveda", "surf", "hiking", "breathwork", "pilates", "sound healing", "reiki"];
+    const activities = activityKeywords.filter(act => 
+      markdown.toLowerCase().includes(act)
+    ).slice(0, 5);
+    if (activities.length === 0) activities.push("Wellness", "Relaxation");
+
+    // Extract image - look for image URLs in content
+    let image = "";
+    const imagePatterns = [
+      /!\[.*?\]\((https?:\/\/[^\s\)]+\.(?:jpg|jpeg|png|webp)[^\s\)]*)\)/i,
+      /(https?:\/\/[^\s"']+\.(?:jpg|jpeg|png|webp))/i,
+      /og:image["\s]+content=["']([^"']+)/i,
+      /image["\s]*:["\s]*["']([^"']+)/i,
+    ];
+    for (const pattern of imagePatterns) {
+      const match = markdown.match(pattern) || metadata.ogImage;
+      if (match) {
+        image = typeof match === "string" ? match : match[1];
+        if (image && image.startsWith("http")) break;
+      }
+    }
+    if (metadata.ogImage) image = metadata.ogImage;
+    
+    // Extract description
+    let description = metadata.description || "";
+    if (!description) {
+      const descMatch = markdown.match(/(?:About|Overview|Description)[:\s]*\n([^\n]+(?:\n[^\n#]+){0,2})/i);
+      description = descMatch ? descMatch[1].trim() : markdown.substring(0, 250);
+    }
+    description = description.replace(/\n/g, " ").replace(/\s+/g, " ").substring(0, 200) + "...";
+
+    const source = url.includes("bookyogaretreats") ? "BookYogaRetreats" : "BookRetreats";
+
+    const result: TravelResult = {
+      id: `retreat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      location,
+      country,
+      duration,
+      price,
+      currency: "USD",
+      description,
+      activities: activities.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
+      source,
+      url,
+      image: image || getFallbackImage({ location, country, activities }),
+      type: "retreat",
+    };
+
+    console.log("Extracted retreat:", result.name, result.price, result.location);
+    return result;
+  } catch (error) {
+    console.error("Scrape error:", error);
+    return null;
+  }
+}
+
+// Scrape holiday page for details
+async function scrapeHolidayPage(url: string, apiKey: string): Promise<TravelResult | null> {
+  try {
+    console.log("Scraping holiday page:", url);
+    
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["markdown"],
+        onlyMainContent: true,
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const markdown = data.data?.markdown || "";
+    const metadata = data.data?.metadata || {};
+    
+    if (!markdown || markdown.length < 100) return null;
+
+    let name = metadata.title || "";
+    name = name.replace(/\s*[-|–].*TripAdvisor.*$/i, "")
+               .replace(/\s*[-|–].*Booking\.com.*$/i, "")
+               .replace(/\s*[-|–].*Viator.*$/i, "")
+               .trim()
+               .substring(0, 80);
+
+    // Extract price
+    let price = 0;
+    const pricePatterns = [
+      /From\s*\$\s*(\d{1,3}(?:,\d{3})*|\d+)/i,
+      /\$\s*(\d{1,3}(?:,\d{3})*|\d+)/i,
+      /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:USD|per person)/i,
+    ];
+    for (const pattern of pricePatterns) {
+      const match = markdown.match(pattern);
+      if (match) {
+        price = parseInt(match[1].replace(/,/g, ""));
+        if (price > 20 && price < 50000) break;
+        price = 0;
+      }
+    }
+    if (price === 0) price = 1299;
+
+    // Extract location
+    let location = "";
+    let country = "";
+    const locationMatch = markdown.match(/(?:in|at|to)\s+([A-Z][a-zA-Z\s]+),?\s*([A-Z][a-zA-Z\s]+)?/);
+    if (locationMatch) {
+      location = locationMatch[1].trim();
+      country = locationMatch[2]?.trim() || "";
+    }
+    if (!location) location = "Beautiful Destination";
+
+    // Duration
+    let duration = "5 days";
+    const durationMatch = markdown.match(/(\d+)\s*(?:day|night|hour)/i);
+    if (durationMatch) {
+      duration = `${durationMatch[1]} days`;
+    }
+
+    // Activities
+    const holidayKeywords = ["tour", "sightseeing", "beach", "adventure", "culture", "safari", "cruise", "food", "wine", "history"];
+    const activities = holidayKeywords.filter(act => markdown.toLowerCase().includes(act)).slice(0, 5);
+    if (activities.length === 0) activities.push("Sightseeing", "Exploration");
+
+    // Image
+    let image = metadata.ogImage || "";
+    if (!image) {
+      const imgMatch = markdown.match(/(https?:\/\/[^\s"']+\.(?:jpg|jpeg|png|webp))/i);
+      if (imgMatch) image = imgMatch[1];
+    }
+
+    // Description
+    let description = metadata.description || markdown.substring(0, 200);
+    description = description.replace(/\n/g, " ").replace(/\s+/g, " ").substring(0, 200) + "...";
+
+    let source = "Travel Site";
+    if (url.includes("tripadvisor")) source = "TripAdvisor";
+    else if (url.includes("booking.com")) source = "Booking.com";
+    else if (url.includes("viator")) source = "Viator";
+
+    return {
+      id: `holiday-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: name || `${location} Holiday Package`,
+      location,
+      country,
+      duration,
+      price,
+      currency: "USD",
+      description,
+      activities: activities.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
+      source,
+      url,
+      image: image || getFallbackImage({ location, country, activities }),
+      type: "holiday",
+    };
+  } catch (error) {
+    console.error("Holiday scrape error:", error);
+    return null;
+  }
+}
+
+// Search and find the BEST retreat match
+async function findBestRetreat(query: string, preferences: any): Promise<TravelResult | null> {
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!FIRECRAWL_API_KEY) return null;
 
   try {
-    // Search both bookretreats.com and bookyogaretreats.com
+    // Build targeted search query
     const searchTerms = [];
     if (preferences?.location) searchTerms.push(preferences.location);
     if (preferences?.activities) searchTerms.push(preferences.activities);
-    searchTerms.push("retreat");
     if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
+    searchTerms.push("retreat");
     
-    const sites = ["bookretreats.com/r/", "bookyogaretreats.com"];
-    const siteQuery = sites.map(s => `site:${s}`).join(" OR ");
-    const fullQuery = `(${siteQuery}) ${searchTerms.join(" ")}`;
-
-    console.log("Searching retreats:", fullQuery);
+    // Search specifically on retreat pages
+    const fullQuery = `(site:bookretreats.com/r/ OR site:bookyogaretreats.com) ${searchTerms.join(" ")}`;
+    
+    console.log("Searching for retreats:", fullQuery);
 
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
@@ -182,66 +399,63 @@ async function searchRetreatSites(query: string, preferences: any): Promise<Trav
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 20,
-        scrapeOptions: {
-          formats: ["markdown"],
-          onlyMainContent: true,
-        },
+        limit: 10,
       }),
     });
 
     if (!response.ok) {
-      console.log("Firecrawl search failed:", response.status);
-      return [];
+      console.log("Search failed:", response.status);
+      return null;
     }
 
     const data = await response.json();
-    const rawResults = data.data || [];
-
-    console.log("Found", rawResults.length, "raw retreat results");
+    const results = data.data || [];
     
+    console.log("Found", results.length, "search results");
+
     // Filter to individual retreat pages only
-    const retreatPages = rawResults.filter((result: any) => {
-      const url = result.url || "";
-      // Accept /r/ pages from bookretreats or product pages from bookyogaretreats
-      const isRetreatPage = url.includes("/r/") || (url.includes("bookyogaretreats") && !url.includes("/s/") && !url.includes("/search"));
-      const isSearchPage = url.includes("/search") || url.includes("/s/") || url.includes("?q=");
-      return isRetreatPage && !isSearchPage;
+    const retreatPages = results.filter((r: any) => {
+      const url = r.url || "";
+      return (url.includes("/r/") || url.includes("bookyogaretreats.com")) && 
+             !url.includes("/search") && 
+             !url.includes("/s/") && 
+             !url.includes("?q=");
     });
 
     console.log("Filtered to", retreatPages.length, "retreat pages");
 
-    for (let i = 0; i < Math.min(retreatPages.length, 8); i++) {
-      const result = retreatPages[i];
-      const parsed = parseRetreatResult(result, i, preferences);
-      if (parsed) results.push(parsed);
+    if (retreatPages.length === 0) return null;
+
+    // Scrape the BEST matching page to get accurate details
+    // Try first 3 results to find one with good data
+    for (let i = 0; i < Math.min(3, retreatPages.length); i++) {
+      const result = await scrapeRetreatPage(retreatPages[i].url, FIRECRAWL_API_KEY);
+      if (result && result.price > 0 && result.name.length > 5) {
+        return result;
+      }
     }
 
+    return null;
   } catch (error) {
     console.error("Retreat search error:", error);
+    return null;
   }
-
-  return results;
 }
 
-// Search holiday/vacation sites
-async function searchHolidaySites(query: string, preferences: any): Promise<TravelResult[]> {
+// Search and find the BEST holiday match
+async function findBestHoliday(query: string, preferences: any): Promise<TravelResult | null> {
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-  
-  if (!FIRECRAWL_API_KEY) return [];
-
-  const results: TravelResult[] = [];
+  if (!FIRECRAWL_API_KEY) return null;
 
   try {
     const searchTerms = [];
     if (preferences?.location) searchTerms.push(preferences.location);
-    searchTerms.push(preferences?.tripType || "holiday vacation");
+    searchTerms.push("holiday vacation package tour");
     if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
     
-    // Search popular holiday sites
-    const fullQuery = `(site:booking.com OR site:tripadvisor.com OR site:viator.com) ${searchTerms.join(" ")} package deal`;
-
-    console.log("Searching holidays:", fullQuery);
+    const fullQuery = `(site:viator.com OR site:tripadvisor.com/AttractionProductReview) ${searchTerms.join(" ")}`;
+    
+    console.log("Searching for holidays:", fullQuery);
 
     const response = await fetch("https://api.firecrawl.dev/v1/search", {
       method: "POST",
@@ -251,200 +465,32 @@ async function searchHolidaySites(query: string, preferences: any): Promise<Trav
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 12,
-        scrapeOptions: {
-          formats: ["markdown"],
-          onlyMainContent: true,
-        },
+        limit: 8,
       }),
     });
 
-    if (!response.ok) {
-      console.log("Holiday search failed:", response.status);
-      return [];
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
-    const rawResults = data.data || [];
+    const results = data.data || [];
+    
+    console.log("Found", results.length, "holiday results");
 
-    console.log("Found", rawResults.length, "holiday results");
+    if (results.length === 0) return null;
 
-    for (let i = 0; i < Math.min(rawResults.length, 6); i++) {
-      const result = rawResults[i];
-      const parsed = parseHolidayResult(result, i, preferences);
-      if (parsed) results.push(parsed);
+    // Scrape the best matching page
+    for (let i = 0; i < Math.min(3, results.length); i++) {
+      const result = await scrapeHolidayPage(results[i].url, FIRECRAWL_API_KEY);
+      if (result && result.name.length > 5) {
+        return result;
+      }
     }
 
+    return null;
   } catch (error) {
     console.error("Holiday search error:", error);
+    return null;
   }
-
-  return results;
-}
-
-function parseRetreatResult(result: any, index: number, preferences: any): TravelResult | null {
-  const title = result.title || "";
-  const url = result.url || "";
-  const content = result.markdown || result.description || "";
-  
-  // Skip if no meaningful content
-  if (!title && !content) return null;
-
-  // Extract location
-  const locationPatterns = [
-    /(?:in|at)\s+([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)/,
-    /Location:\s*([^,\n]+(?:,\s*[^,\n]+)?)/i,
-  ];
-  
-  let location = preferences?.location || "Scenic Location";
-  let country = "";
-  
-  for (const pattern of locationPatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      const parts = match[1].split(",").map((p: string) => p.trim());
-      location = parts[0] || location;
-      country = parts[1] || "";
-      break;
-    }
-  }
-  
-  // Extract price
-  const pricePatterns = [
-    /\$\s*(\d{1,3}(?:,\d{3})*|\d+)/,
-    /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:usd|dollars?)/i,
-    /from\s*\$?\s*(\d+)/i,
-  ];
-  
-  let price = 500 + (index * 150);
-  for (const pattern of pricePatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      price = parseInt(match[1].replace(/,/g, ""));
-      break;
-    }
-  }
-  
-  // Extract duration
-  const durationPatterns = [/(\d+)\s*(?:day|night)/i, /(\d+)\s*Days/];
-  let duration = `${5 + (index % 5)} days`;
-  for (const pattern of durationPatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      duration = `${match[1]} days`;
-      break;
-    }
-  }
-  
-  // Extract activities
-  const activityKeywords = ["yoga", "meditation", "surf", "spa", "wellness", "detox", "hiking", "ayurveda", "massage", "healing", "pilates", "breathwork", "retreat"];
-  const activities = activityKeywords.filter(act => 
-    title.toLowerCase().includes(act) || content.toLowerCase().includes(act)
-  ).slice(0, 4);
-  
-  if (activities.length === 0) {
-    activities.push("Wellness", "Relaxation");
-  }
-
-  // Clean title
-  const cleanTitle = title
-    .replace(/BookRetreats\.com|BookYogaRetreats\.com/gi, "")
-    .replace(/\|.*$/g, "")
-    .replace(/-\s*$/, "")
-    .trim()
-    .substring(0, 60);
-
-  // Determine source
-  const source = url.includes("bookyogaretreats") ? "BookYogaRetreats" : "BookRetreats";
-
-  const retreat: TravelResult = {
-    id: `retreat-${index + 1}-${Date.now()}`,
-    name: cleanTitle || `${activities[0]} Retreat in ${location}`,
-    location,
-    country,
-    duration,
-    price,
-    currency: "USD",
-    description: (result.description || content.substring(0, 200)).replace(/\n/g, " ").trim().substring(0, 180) + "...",
-    activities: activities.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
-    source,
-    url,
-    type: "retreat",
-  };
-
-  retreat.image = getTravelImage(retreat);
-  return retreat;
-}
-
-function parseHolidayResult(result: any, index: number, preferences: any): TravelResult | null {
-  const title = result.title || "";
-  const url = result.url || "";
-  const content = result.markdown || result.description || "";
-  
-  if (!title && !content) return null;
-
-  let location = preferences?.location || "Beautiful Destination";
-  let country = "";
-  
-  // Try to extract location from title or content
-  const locationMatch = title.match(/in\s+([A-Z][a-zA-Z\s]+)/i);
-  if (locationMatch) {
-    location = locationMatch[1].trim();
-  }
-
-  // Extract price
-  let price = 800 + (index * 200);
-  const priceMatch = content.match(/\$\s*(\d{1,3}(?:,\d{3})*|\d+)/);
-  if (priceMatch) {
-    price = parseInt(priceMatch[1].replace(/,/g, ""));
-  }
-
-  // Extract duration
-  let duration = `${4 + (index % 4)} days`;
-  const durationMatch = content.match(/(\d+)\s*(?:day|night)/i);
-  if (durationMatch) {
-    duration = `${durationMatch[1]} days`;
-  }
-
-  // Determine activities/highlights
-  const holidayKeywords = ["beach", "adventure", "culture", "sightseeing", "tour", "safari", "cruise", "city", "nature", "romance", "luxury", "family"];
-  const activities = holidayKeywords.filter(act => 
-    title.toLowerCase().includes(act) || content.toLowerCase().includes(act)
-  ).slice(0, 4);
-  
-  if (activities.length === 0) {
-    activities.push("Exploration", "Sightseeing");
-  }
-
-  const cleanTitle = title
-    .replace(/\|.*$/g, "")
-    .replace(/-\s*TripAdvisor|-\s*Booking\.com|-\s*Viator/gi, "")
-    .trim()
-    .substring(0, 60);
-
-  // Determine source
-  let source = "Travel Site";
-  if (url.includes("tripadvisor")) source = "TripAdvisor";
-  else if (url.includes("booking.com")) source = "Booking.com";
-  else if (url.includes("viator")) source = "Viator";
-
-  const holiday: TravelResult = {
-    id: `holiday-${index + 1}-${Date.now()}`,
-    name: cleanTitle || `${location} Holiday Package`,
-    location,
-    country,
-    duration,
-    price,
-    currency: "USD",
-    description: (result.description || content.substring(0, 200)).replace(/\n/g, " ").trim().substring(0, 180) + "...",
-    activities: activities.map(a => a.charAt(0).toUpperCase() + a.slice(1)),
-    source,
-    url,
-    type: "holiday",
-  };
-
-  holiday.image = getTravelImage(holiday);
-  return holiday;
 }
 
 // Extract preferences from conversation
@@ -453,9 +499,9 @@ function extractPreferences(messages: any[]): any {
   const preferences: any = {};
   
   // Budget
-  const budgetMatch = allText.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|under\s+\$?(\d+)|max(?:imum)?\s+\$?(\d+)|budget[:\s]+\$?(\d+)/i);
+  const budgetMatch = allText.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|under\s+\$?(\d+)|budget[:\s]+\$?(\d+)/i);
   if (budgetMatch) {
-    preferences.budget = budgetMatch[1] || budgetMatch[3] || budgetMatch[4] || budgetMatch[5];
+    preferences.budget = budgetMatch[1] || budgetMatch[3] || budgetMatch[4];
   }
   
   // Duration
@@ -466,14 +512,13 @@ function extractPreferences(messages: any[]): any {
     preferences.duration = days.toString();
   }
   
-  // Location - expanded list
+  // Location
   const locations = [
     "thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", 
     "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "cambodia", 
     "usa", "sedona", "hawaii", "california", "rishikesh", "ubud", "koh samui", "phuket", 
     "goa", "maldives", "dubai", "italy", "france", "paris", "rome", "japan", "tokyo", 
-    "australia", "sydney", "caribbean", "bahamas", "jamaica", "cancun", "switzerland",
-    "london", "new york", "miami", "las vegas", "singapore", "hong kong"
+    "australia", "sydney", "caribbean", "bahamas", "jamaica", "cancun", "switzerland"
   ];
   for (const loc of locations) {
     if (allText.toLowerCase().includes(loc)) {
@@ -493,18 +538,14 @@ function extractPreferences(messages: any[]): any {
     preferences.activities = foundActivities.join(" ");
   }
 
-  // Trip type detection
+  // Trip type
   if (allText.toLowerCase().includes("holiday") || allText.toLowerCase().includes("vacation")) {
     preferences.tripType = "holiday";
   } else if (allText.toLowerCase().includes("retreat")) {
     preferences.tripType = "retreat";
-  } else if (allText.toLowerCase().includes("honeymoon") || allText.toLowerCase().includes("romantic")) {
-    preferences.tripType = "honeymoon";
-  } else if (allText.toLowerCase().includes("adventure")) {
-    preferences.tripType = "adventure";
   }
   
-  console.log("Extracted preferences:", preferences);
+  console.log("Preferences:", preferences);
   return preferences;
 }
 
@@ -512,38 +553,28 @@ function extractPreferences(messages: any[]): any {
 function detectIntent(message: string): "greeting" | "search" | "question" | "general" | "need_info" {
   const lowerMsg = message.toLowerCase().trim();
   
-  // Greeting patterns
-  const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "hola", "namaste"];
+  const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "hola"];
   if (greetings.some(g => lowerMsg === g || lowerMsg.startsWith(g + " ") || lowerMsg.startsWith(g + ","))) {
     return "greeting";
   }
   
-  // General/daily life questions
-  const generalPatterns = [
-    "weather", "temperature", "forecast", "time", "date", "news", 
-    "how are you", "what can you do", "help me", "who are you",
-    "thank you", "thanks", "bye", "goodbye", "see you"
-  ];
+  const generalPatterns = ["weather", "temperature", "time", "date", "how are you", "what can you do", "thank you", "thanks", "bye"];
   if (generalPatterns.some(p => lowerMsg.includes(p))) {
     return "general";
   }
 
-  // Check if asking a question
-  const questionPatterns = ["what is", "what's", "how does", "can you", "do you", "tell me about", "explain", "what are"];
+  const questionPatterns = ["what is", "what's", "how does", "can you", "tell me about", "explain"];
   if (questionPatterns.some(q => lowerMsg.startsWith(q))) {
     return "question";
   }
   
-  // Check for search intent
   const hasLocation = [
     "thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", 
-    "sri lanka", "nepal", "peru", "egypt", "morocco", "indonesia", "vietnam", "maldives",
-    "dubai", "hawaii", "italy", "france", "japan", "australia", "caribbean", "switzerland"
+    "sri lanka", "nepal", "peru", "maldives", "dubai", "hawaii", "italy", "france", "japan"
   ].some(loc => lowerMsg.includes(loc));
   
   const hasActivity = [
-    "yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", 
-    "hiking", "beach", "safari", "cruise", "ski", "romantic", "honeymoon", "spa"
+    "yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "beach", "safari"
   ].some(act => lowerMsg.includes(act));
   
   const hasSearchIntent = [
@@ -551,20 +582,14 @@ function detectIntent(message: string): "greeting" | "search" | "question" | "ge
     "need", "book", "interested", "planning", "trip", "travel", "holiday", "vacation", "retreat"
   ].some(s => lowerMsg.includes(s));
   
-  const hasBudget = /\$\d+|budget|under|max/i.test(lowerMsg);
-  const hasDuration = /\d+\s*(day|night|week)/i.test(lowerMsg);
-  
-  // If they have specific criteria, search
-  if (hasSearchIntent && (hasLocation || hasActivity || hasBudget || hasDuration)) {
+  if (hasSearchIntent && (hasLocation || hasActivity)) {
     return "search";
   }
   
-  // If just location or activity mentioned
   if (hasLocation || hasActivity) {
     return "search";
   }
   
-  // Vague search intent
   if (hasSearchIntent) {
     return "need_info";
   }
@@ -593,17 +618,15 @@ serve(async (req) => {
     const intent = detectIntent(userQuery);
     console.log("Intent:", intent, "Query:", userQuery.substring(0, 50));
 
-    let finalResults: TravelResult[] = [];
-    let sourceText = "";
+    let bestResult: TravelResult | null = null;
     
-    // Only search for retreats/holidays if intent is search
+    // Only search if intent is search
     if (intent === "search") {
       const preferences = extractPreferences(messages);
+      
       const isHolidaySearch = preferences.tripType === "holiday" || 
         userQuery.toLowerCase().includes("holiday") || 
-        userQuery.toLowerCase().includes("vacation") ||
-        userQuery.toLowerCase().includes("trip") ||
-        userQuery.toLowerCase().includes("travel");
+        userQuery.toLowerCase().includes("vacation");
       
       const isRetreatSearch = preferences.tripType === "retreat" || 
         userQuery.toLowerCase().includes("retreat") || 
@@ -611,112 +634,41 @@ serve(async (req) => {
         userQuery.toLowerCase().includes("meditation") ||
         userQuery.toLowerCase().includes("wellness");
 
-      // Search in parallel based on what user wants
-      const searchPromises: Promise<TravelResult[]>[] = [];
+      // First check curated retreats
+      const curatedResults = await searchCuratedRetreats(preferences);
       
-      // Always search curated retreats
-      searchPromises.push(searchCuratedRetreats(preferences));
-      
-      // Search retreats if relevant or if neither is specified
-      if (isRetreatSearch || (!isHolidaySearch && !isRetreatSearch)) {
-        searchPromises.push(searchRetreatSites(userQuery, preferences));
-      } else {
-        searchPromises.push(Promise.resolve([]));
+      if (curatedResults.length > 0 && !isHolidaySearch) {
+        // Return best curated match
+        bestResult = curatedResults[0];
+        console.log("Using curated result:", bestResult.name);
+      } else if (isHolidaySearch) {
+        // Search for holidays
+        bestResult = await findBestHoliday(userQuery, preferences);
+        console.log("Holiday search result:", bestResult?.name || "none");
+      } else if (isRetreatSearch || !bestResult) {
+        // Search for retreats
+        bestResult = await findBestRetreat(userQuery, preferences);
+        console.log("Retreat search result:", bestResult?.name || "none");
       }
-      
-      // Search holidays if relevant
-      if (isHolidaySearch) {
-        searchPromises.push(searchHolidaySites(userQuery, preferences));
-      } else {
-        searchPromises.push(Promise.resolve([]));
-      }
-
-      const [curatedRetreats, retreatResults, holidayResults] = await Promise.all(searchPromises);
-
-      console.log("Found:", curatedRetreats.length, "curated,", retreatResults.length, "retreats,", holidayResults.length, "holidays");
-
-      // Combine and deduplicate
-      const allResults = [...curatedRetreats, ...retreatResults, ...holidayResults];
-      const uniqueResults: TravelResult[] = [];
-      const seenNames = new Set<string>();
-      
-      for (const result of allResults) {
-        const normalizedName = result.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (!seenNames.has(normalizedName)) {
-          seenNames.add(normalizedName);
-          uniqueResults.push(result);
-        }
-      }
-
-      finalResults = uniqueResults.slice(0, 6);
-
-      // Build source text
-      const sources: string[] = [];
-      if (curatedRetreats.length > 0) sources.push("our curated collection");
-      if (retreatResults.length > 0) sources.push("BookRetreats & BookYogaRetreats");
-      if (holidayResults.length > 0) sources.push("top travel sites");
-      sourceText = sources.length > 0 ? `from ${sources.join(" and ")}` : "";
     }
 
-    // Build context for AI
-    const resultContext = finalResults.length > 0 ? finalResults.map((r, i) => 
-      `${i + 1}. ${r.name} - ${r.location}${r.country ? `, ${r.country}` : ""} - $${r.price} - ${r.duration} - ${r.activities.join(", ")} [${r.source}]`
-    ).join("\n") : "";
-
-    // Build comprehensive system prompt
-    let systemPrompt = `You are Sarah, a friendly and knowledgeable travel specialist at "Retreats Holidays". You help people find perfect retreats, holidays, and travel experiences.
-
-PERSONALITY:
-- Warm, genuine, and conversational - like chatting with a helpful friend
-- Empathetic - understand and acknowledge feelings
-- Knowledgeable but not pushy
-- Use natural language with contractions
-- Keep responses concise (2-4 sentences typically)
-- Be precise and accurate
-
-CAPABILITIES:
-- Find retreats (yoga, meditation, wellness, detox, etc.)
-- Find holidays and vacation packages
-- Answer general questions about travel, weather, destinations
-- Have friendly conversations about anything
+    // Build system prompt
+    let systemPrompt = `You are Sarah, a friendly travel specialist. Keep responses SHORT and natural (1-2 sentences max).
 
 `;
 
     if (intent === "greeting") {
-      systemPrompt += `SITUATION: User just greeted you.
-
-RESPONSE: Warmly greet them. Ask what kind of trip they're looking for (retreat or holiday). Max 2 sentences.`;
-
+      systemPrompt += `User just greeted you. Warmly greet back and ask what kind of trip they want (retreat or holiday). Max 2 sentences.`;
     } else if (intent === "general") {
-      systemPrompt += `SITUATION: User asking a general/daily life question.
-
-RESPONSE: Answer briefly and naturally. Max 2-3 sentences.`;
-
+      systemPrompt += `User asking a general question. Answer briefly and naturally. Max 2 sentences.`;
     } else if (intent === "question") {
-      systemPrompt += `SITUATION: User asking an informational question.
-
-RESPONSE: Answer concisely. Max 2-3 sentences.`;
-
+      systemPrompt += `User asking an informational question. Answer concisely. Max 2 sentences.`;
     } else if (intent === "need_info") {
-      systemPrompt += `SITUATION: User wants to find something but hasn't given enough details.
-
-RESPONSE: Ask 1 quick question about their destination preference. Keep it to 1-2 sentences.`;
-
-    } else if (intent === "search" && finalResults.length > 0) {
-      const resultType = finalResults[0]?.type === "holiday" ? "holiday options" : "retreats";
-      systemPrompt += `SITUATION: Found ${finalResults.length} ${resultType} ${sourceText}.
-
-CRITICAL INSTRUCTIONS:
-- Say ONLY: "Here are some ${resultType} I found for you! Take a look below 👇"
-- Do NOT describe the options - the cards will show all details
-- Do NOT mention prices, locations, or durations in text
-- Keep response under 15 words
-- The cards are displayed automatically below your message`;
-
-    } else if (intent === "search" && finalResults.length === 0) {
-      systemPrompt += `SITUATION: Searched but found no exact matches.
-
-RESPONSE: Apologize briefly. Suggest trying a different location or type. Max 2 sentences.`;
+      systemPrompt += `User wants to find something but needs guidance. Ask about their preferred destination or type of experience. Max 1-2 sentences.`;
+    } else if (intent === "search" && bestResult) {
+      systemPrompt += `Found a perfect match! Say ONLY: "I found the perfect option for you! 👇" - nothing else. The card below shows all details.`;
+    } else if (intent === "search" && !bestResult) {
+      systemPrompt += `Couldn't find exact matches. Apologize briefly and ask if they'd like to try a different destination or activity type. Max 2 sentences.`;
     }
 
     // Call AI
@@ -740,15 +692,8 @@ RESPONSE: Apologize briefly. Suggest trying a different location or type. Max 2 
       console.error("AI error:", aiResponse.status, errorText);
       
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits required." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       
@@ -756,13 +701,13 @@ RESPONSE: Apologize briefly. Suggest trying a different location or type. Max 2 
     }
 
     const data = await aiResponse.json();
-    const content = data.choices?.[0]?.message?.content || "I'd love to help you find the perfect travel experience!";
+    const content = data.choices?.[0]?.message?.content || "I'd love to help you find the perfect experience!";
     
-    console.log("Response generated with", finalResults.length, "results");
+    console.log("Response:", content.substring(0, 50), "Result:", bestResult?.name || "none");
 
     return new Response(JSON.stringify({ 
       content,
-      retreats: finalResults.slice(0, 6)
+      retreats: bestResult ? [bestResult] : []
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -770,8 +715,7 @@ RESPONSE: Apologize briefly. Suggest trying a different location or type. Max 2 
     console.error("Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
