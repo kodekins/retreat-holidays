@@ -373,20 +373,18 @@ async function scrapeHolidayPage(url: string, apiKey: string): Promise<TravelRes
   }
 }
 
-// Search and find the BEST retreat match
-async function findBestRetreat(query: string, preferences: any): Promise<TravelResult | null> {
+// Search and find MULTIPLE retreat matches
+async function findBestRetreats(query: string, preferences: any): Promise<TravelResult[]> {
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-  if (!FIRECRAWL_API_KEY) return null;
+  if (!FIRECRAWL_API_KEY) return [];
 
   try {
-    // Build targeted search query
     const searchTerms = [];
     if (preferences?.location) searchTerms.push(preferences.location);
     if (preferences?.activities) searchTerms.push(preferences.activities);
     if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
     searchTerms.push("retreat");
     
-    // Search specifically on retreat pages
     const fullQuery = `(site:bookretreats.com/r/ OR site:bookyogaretreats.com) ${searchTerms.join(" ")}`;
     
     console.log("Searching for retreats:", fullQuery);
@@ -399,13 +397,13 @@ async function findBestRetreat(query: string, preferences: any): Promise<TravelR
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 10,
+        limit: 20,
       }),
     });
 
     if (!response.ok) {
       console.log("Search failed:", response.status);
-      return null;
+      return [];
     }
 
     const data = await response.json();
@@ -413,7 +411,6 @@ async function findBestRetreat(query: string, preferences: any): Promise<TravelR
     
     console.log("Found", results.length, "search results");
 
-    // Filter to individual retreat pages only
     const retreatPages = results.filter((r: any) => {
       const url = r.url || "";
       return (url.includes("/r/") || url.includes("bookyogaretreats.com")) && 
@@ -424,28 +421,29 @@ async function findBestRetreat(query: string, preferences: any): Promise<TravelR
 
     console.log("Filtered to", retreatPages.length, "retreat pages");
 
-    if (retreatPages.length === 0) return null;
+    if (retreatPages.length === 0) return [];
 
-    // Scrape the BEST matching page to get accurate details
-    // Try first 3 results to find one with good data
-    for (let i = 0; i < Math.min(3, retreatPages.length); i++) {
+    // Scrape up to 10 pages to get accurate details
+    const scrapedResults: TravelResult[] = [];
+    for (let i = 0; i < Math.min(12, retreatPages.length); i++) {
       const result = await scrapeRetreatPage(retreatPages[i].url, FIRECRAWL_API_KEY);
       if (result && result.price > 0 && result.name.length > 5) {
-        return result;
+        scrapedResults.push(result);
+        if (scrapedResults.length >= 10) break;
       }
     }
 
-    return null;
+    return scrapedResults;
   } catch (error) {
     console.error("Retreat search error:", error);
-    return null;
+    return [];
   }
 }
 
-// Search and find the BEST holiday match
-async function findBestHoliday(query: string, preferences: any): Promise<TravelResult | null> {
+// Search and find MULTIPLE holiday matches
+async function findBestHolidays(query: string, preferences: any): Promise<TravelResult[]> {
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
-  if (!FIRECRAWL_API_KEY) return null;
+  if (!FIRECRAWL_API_KEY) return [];
 
   try {
     const searchTerms = [];
@@ -465,31 +463,33 @@ async function findBestHoliday(query: string, preferences: any): Promise<TravelR
       },
       body: JSON.stringify({
         query: fullQuery,
-        limit: 8,
+        limit: 20,
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) return [];
 
     const data = await response.json();
     const results = data.data || [];
     
     console.log("Found", results.length, "holiday results");
 
-    if (results.length === 0) return null;
+    if (results.length === 0) return [];
 
-    // Scrape the best matching page
-    for (let i = 0; i < Math.min(3, results.length); i++) {
+    // Scrape up to 10 pages
+    const scrapedResults: TravelResult[] = [];
+    for (let i = 0; i < Math.min(12, results.length); i++) {
       const result = await scrapeHolidayPage(results[i].url, FIRECRAWL_API_KEY);
       if (result && result.name.length > 5) {
-        return result;
+        scrapedResults.push(result);
+        if (scrapedResults.length >= 10) break;
       }
     }
 
-    return null;
+    return scrapedResults;
   } catch (error) {
     console.error("Holiday search error:", error);
-    return null;
+    return [];
   }
 }
 
@@ -618,7 +618,7 @@ serve(async (req) => {
     const intent = detectIntent(userQuery);
     console.log("Intent:", intent, "Query:", userQuery.substring(0, 50));
 
-    let bestResult: TravelResult | null = null;
+    let allResults: TravelResult[] = [];
     
     // Only search if intent is search
     if (intent === "search") {
@@ -637,18 +637,24 @@ serve(async (req) => {
       // First check curated retreats
       const curatedResults = await searchCuratedRetreats(preferences);
       
-      if (curatedResults.length > 0 && !isHolidaySearch) {
-        // Return best curated match
-        bestResult = curatedResults[0];
-        console.log("Using curated result:", bestResult.name);
-      } else if (isHolidaySearch) {
+      if (isHolidaySearch) {
         // Search for holidays
-        bestResult = await findBestHoliday(userQuery, preferences);
-        console.log("Holiday search result:", bestResult?.name || "none");
-      } else if (isRetreatSearch || !bestResult) {
-        // Search for retreats
-        bestResult = await findBestRetreat(userQuery, preferences);
-        console.log("Retreat search result:", bestResult?.name || "none");
+        const holidayResults = await findBestHolidays(userQuery, preferences);
+        allResults = holidayResults;
+        console.log("Holiday search results:", allResults.length);
+      } else if (isRetreatSearch) {
+        // Combine curated and scraped retreats
+        const scrapedRetreats = await findBestRetreats(userQuery, preferences);
+        allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
+        console.log("Retreat search results:", allResults.length);
+      } else {
+        // Default to retreats
+        allResults = curatedResults.slice(0, 10);
+        if (allResults.length < 10) {
+          const scrapedRetreats = await findBestRetreats(userQuery, preferences);
+          allResults = [...allResults, ...scrapedRetreats].slice(0, 10);
+        }
+        console.log("Default search results:", allResults.length);
       }
     }
 
@@ -665,9 +671,9 @@ serve(async (req) => {
       systemPrompt += `User asking an informational question. Answer concisely. Max 2 sentences.`;
     } else if (intent === "need_info") {
       systemPrompt += `User wants to find something but needs guidance. Ask about their preferred destination or type of experience. Max 1-2 sentences.`;
-    } else if (intent === "search" && bestResult) {
-      systemPrompt += `Found a perfect match! Say ONLY: "I found the perfect option for you! 👇" - nothing else. The card below shows all details.`;
-    } else if (intent === "search" && !bestResult) {
+    } else if (intent === "search" && allResults.length > 0) {
+      systemPrompt += `Found ${allResults.length} great options! Say ONLY: "Here are the top ${allResults.length} options for you! 👇" - nothing else. The cards below show all details.`;
+    } else if (intent === "search" && allResults.length === 0) {
       systemPrompt += `Couldn't find exact matches. Apologize briefly and ask if they'd like to try a different destination or activity type. Max 2 sentences.`;
     }
 
@@ -703,11 +709,11 @@ serve(async (req) => {
     const data = await aiResponse.json();
     const content = data.choices?.[0]?.message?.content || "I'd love to help you find the perfect experience!";
     
-    console.log("Response:", content.substring(0, 50), "Result:", bestResult?.name || "none");
+    console.log("Response:", content.substring(0, 50), "Results:", allResults.length);
 
     return new Response(JSON.stringify({ 
       content,
-      retreats: bestResult ? [bestResult] : []
+      retreats: allResults
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
