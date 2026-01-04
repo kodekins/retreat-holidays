@@ -232,10 +232,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
                 </div>
                 {message.retreats && message.retreats.length > 0 && (
                   <div className="space-y-3 mt-2">
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Found {message.retreats.length} options for you:
-                    </p>
-                    {message.retreats.slice(0, 5).map((retreat) => (
+                    {message.retreats.slice(0, 3).map((retreat) => (
                       <RetreatCard
                         key={retreat.id}
                         retreat={retreat}
