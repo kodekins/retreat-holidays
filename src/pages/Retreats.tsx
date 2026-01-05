@@ -202,11 +202,10 @@ const Retreats = () => {
           {/* Hero Section */}
           <div className="text-center mb-8">
             <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-              Curated Retreats
+              Explore our retreats
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Handpicked wellness retreats from our expert travel guides. 
-              Each retreat is personally verified to ensure an unforgettable experience.
+              Retreats Holidays has prepared special programs welcoming you to unique retreats that combine yoga, wellness, and adventure activities designed to provide you with an unforgettable experience.
             </p>
           </div>
 
