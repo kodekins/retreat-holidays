@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Retreat } from '@/types/retreat';
 import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import DetailedFooter from '@/components/DetailedFooter';
 import BookingModal from '@/components/BookingModal';
 import { MessageCircle, MapPin, Calendar, DollarSign, Star, Loader2, Filter, X } from 'lucide-react';
 import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
@@ -431,7 +431,7 @@ const Retreats = () => {
         </div>
       </main>
 
-      <Footer />
+      <DetailedFooter />
 
       <BookingModal
         isOpen={isBookingModalOpen}
