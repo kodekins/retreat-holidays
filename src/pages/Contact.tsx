@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import DetailedFooter from '@/components/DetailedFooter';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -154,7 +154,7 @@ const Contact = () => {
         </section>
       </main>
 
-      <Footer />
+      <DetailedFooter />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import DetailedFooter from '@/components/DetailedFooter';
 import { Progress } from '@/components/ui/progress';
 import { MessageSquare, Target, Gift, Plane, Heart, Smile } from 'lucide-react';
 
@@ -185,7 +185,7 @@ const About = () => {
         </section>
       </main>
 
-      <Footer />
+      <DetailedFooter />
     </div>
   );
 };
