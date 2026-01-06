@@ -5,7 +5,7 @@ const Terms = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <title>Terms & Conditions | Retreats Holidays</title>
-      <meta name="description" content="Read our terms of service and privacy policy for using Retreats Holidays services." />
+      <meta name="description" content="Read our terms of use and privacy policy for using Retreats Holidays services." />
       
       <Header />
       
@@ -22,120 +22,220 @@ const Terms = () => {
           </div>
         </section>
 
-        {/* Terms of Service */}
+        {/* Terms Content */}
         <section className="py-16 bg-background">
           <div className="container mx-auto px-4 max-w-4xl">
-            <h2 className="text-3xl font-display font-bold text-foreground mb-8">
-              Terms of Service
-            </h2>
-            
-            <div className="space-y-6 text-muted-foreground">
+            <div className="space-y-8 text-muted-foreground">
+              
+              {/* Section 1 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">1. Acceptance of Terms</h3>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">1. Who We Are and How to Contact Us</h2>
                 <p>
-                  By accessing and using Retreats Holidays services, you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+                  The Platform is owned and operated by Quantum Solutions Trading DMCC, with a head office in Dubai and its registered office located at Jumeirah Lakes Towers, Cluster W, JBC5, Office 607. Registered DMCC Company: JLT2108 ("we", "our", "us", "Retreats Holidays"). To contact us, please email: info@retreats-holidays.com
                 </p>
               </div>
 
+              {/* Section 2 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">2. Services Description</h3>
-                <p>
-                  Retreats Holidays provides curated wellness retreat experiences, including yoga retreats, meditation retreats, and holistic wellness programs. We act as an intermediary between retreat organizers and customers, facilitating bookings and providing information about various retreat options.
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">2. About Us</h2>
+                <p className="mb-4">
+                  Retreats Holidays is a leading wellness and adventure platform, offering bespoke retreats and active experiences. We provide a space for verified Service Providers (the "Service Providers") to advertise their offerings to customers (the "Guests"). Our platform supports the listing and booking of:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Wellness retreats (yoga retreats, wellness stays, spa escapes)</li>
+                  <li>Sports and fitness services (e.g. kitesurfing, yoga instructors, fitness classes)</li>
+                  <li>Outdoor and adventure experiences (e.g. hiking, nature immersion, sailing)</li>
+                  <li>Culinary services (e.g. private chefs, catering, in-house meals)</li>
+                  <li>Transport solutions (e.g. airport transfers, regional travel)</li>
+                </ul>
+                <p className="mt-4">
+                  These services are collectively referred to as the "Services". All users of the platform, including Service Providers and Guests, are referred to as "users".
+                </p>
+                <p className="mt-4">
+                  We also offer an AI-powered chatbot service to help users explore and connect with retreat experiences more efficiently. This chatbot acts as a connector, providing tailored suggestions and introducing Guests to relevant Service Providers. However, as with any online marketplace, it is the Guest's responsibility to follow up directly with the Service Provider to confirm service details, pricing, and booking conditions. Retreats Holidays acts solely as an intermediary and does not assume any liability for incomplete, inaccurate, or unverified information exchanged after the connection.
                 </p>
               </div>
 
+              {/* Section 3 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">3. Booking and Payments</h3>
-                <p>
-                  All bookings are subject to availability. Payment terms vary depending on the retreat and will be clearly communicated at the time of booking. Deposits may be required to secure your reservation. Full payment is typically due before the retreat start date.
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">3. Acceptance of Terms</h2>
+                <p className="mb-4">
+                  By using our Platform, you confirm that you accept these Terms of Use and agree to comply with them. If you do not agree, you must not use the Platform.
                 </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>You must be 18 years of age or older to use our Platform.</li>
+                  <li>Cardholders must retain transaction records and our policies.</li>
+                  <li>Visa and MasterCard in AED, USD, and EUR are accepted.</li>
+                  <li>Prices and currencies displayed at checkout will match the transaction receipt.</li>
+                </ul>
               </div>
 
+              {/* Section 4 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">4. Cancellation Policy</h3>
-                <p>
-                  Cancellation policies vary by retreat. Please review the specific cancellation terms for your chosen retreat before booking. In general, cancellations made well in advance may be eligible for refunds or credits, while late cancellations may incur fees.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">4. Other Terms That May Apply</h2>
+                <p className="mb-4">These Terms refer to the following additional policies:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Cookie Policy</li>
+                  <li>Privacy and Data Protection Policy (GDPR compliant)</li>
+                  <li>Acceptable Use Policy</li>
+                </ul>
               </div>
 
+              {/* Section 5 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">5. User Responsibilities</h3>
-                <p>
-                  Users are responsible for providing accurate personal information, maintaining the confidentiality of their account, and ensuring they meet any health or physical requirements for their chosen retreat. Participants should consult with healthcare providers before engaging in physical activities.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">5. Changes to Terms</h2>
+                <p>We may revise these Terms at any time. Users are encouraged to review them regularly.</p>
               </div>
 
+              {/* Section 6 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">6. Limitation of Liability</h3>
-                <p>
-                  Retreats Holidays shall not be liable for any indirect, incidental, or consequential damages arising from the use of our services. Our liability is limited to the amount paid for the specific service in question.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">6. Changes to the Platform</h2>
+                <p>We reserve the right to update, modify, or suspend the Platform at any time. We are not liable if the Platform is unavailable.</p>
               </div>
 
+              {/* Section 7 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">7. Changes to Terms</h3>
-                <p>
-                  We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting. Continued use of our services constitutes acceptance of modified terms.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Privacy Policy */}
-        <section className="py-16 bg-muted/30">
-          <div className="container mx-auto px-4 max-w-4xl">
-            <h2 className="text-3xl font-display font-bold text-foreground mb-8">
-              Privacy Policy
-            </h2>
-            
-            <div className="space-y-6 text-muted-foreground">
-              <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">1. Information We Collect</h3>
-                <p>
-                  We collect information you provide directly, including name, email address, phone number, and payment information. We also collect usage data, device information, and cookies to improve our services.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">7. Account Security</h2>
+                <p>User credentials must be kept confidential. If unauthorized access is suspected, notify us immediately.</p>
               </div>
 
+              {/* Section 8 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">2. How We Use Your Information</h3>
-                <p>
-                  Your information is used to process bookings, communicate about retreats, send promotional materials (with consent), improve our services, and comply with legal obligations. We do not sell your personal information to third parties.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">8. Platform Usage & Booking</h2>
+                <p>The Platform is for personal, non-commercial use only. Users may not modify or commercially exploit any part of the Platform without explicit permission. A stable internet connection is required.</p>
               </div>
 
+              {/* Section 9 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">3. Data Security</h3>
-                <p>
-                  We implement industry-standard security measures to protect your personal information. However, no method of transmission over the internet is 100% secure. We encourage users to take precautions when sharing personal information online.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">9. User Conduct</h2>
+                <p className="mb-4">Users agree not to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Post or transmit unlawful, offensive, or abusive content.</li>
+                  <li>Interfere with the Platform's performance.</li>
+                  <li>Send unsolicited or promotional material.</li>
+                </ul>
               </div>
 
+              {/* Section 10 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">4. Cookies and Tracking</h3>
-                <p>
-                  We use cookies and similar technologies to enhance user experience, analyze site traffic, and personalize content. You can control cookie preferences through your browser settings.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">10. Third-Party Links</h2>
+                <p>Links to third-party websites (e.g. partners or hotels) are for information only. We do not endorse or control their content.</p>
               </div>
 
+              {/* Section 11 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">5. Third-Party Services</h3>
-                <p>
-                  Our website may contain links to third-party services. We are not responsible for the privacy practices of these external sites. We encourage you to review their privacy policies before providing any personal information.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">11. Liability Disclaimer</h2>
+                <p className="mb-4">We are not liable for:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Platform interruptions or errors.</li>
+                  <li>Indirect losses (e.g. profits, data, goodwill).</li>
+                  <li>Bookings made through third-party Service Providers. We only limit liability where it is legally permissible to do so.</li>
+                </ul>
               </div>
 
+              {/* Section 12 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">6. Your Rights</h3>
-                <p>
-                  You have the right to access, correct, or delete your personal information. You may also opt out of marketing communications at any time. To exercise these rights, please contact us at contact@retreats-holidays.com.
-                </p>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">12. Data Use</h2>
+                <p>We process data in line with our Privacy Policy.</p>
               </div>
 
+              {/* Section 13 */}
               <div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">7. Contact Us</h3>
-                <p>
-                  If you have questions about this Privacy Policy or our data practices, please contact us at contact@retreats-holidays.com.
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">13. Viruses & Security</h2>
+                <p>Users must not introduce harmful content. We report such violations to law enforcement.</p>
+              </div>
+
+              {/* Section 14 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">14. Force Majeure</h2>
+                <p>We are not liable for delays due to events beyond our control (e.g. natural disasters, war, government actions).</p>
+              </div>
+
+              {/* Section 15 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">15. No Third-Party Beneficiaries</h2>
+                <p>Unless explicitly stated, no third party has rights under these Terms.</p>
+              </div>
+
+              {/* Section 16 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">16. Governing Law</h2>
+                <p>These Terms are governed by UAE law. Disputes will be resolved by UAE courts unless agreed otherwise.</p>
+              </div>
+
+              {/* Section 17 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">17. Fees</h2>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Service Providers: 5% booking fee deducted from payouts.</li>
+                  <li>Guests: 3.5% booking fee added at checkout.</li>
+                  <li>Damage fines: Not applicable (Service Providers must insure themselves).</li>
+                </ul>
+              </div>
+
+              {/* Section 18 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">18. Service Providers</h2>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Must have valid insurance.</li>
+                  <li>Ensure clean and functioning spaces.</li>
+                  <li>Submit relevant certifications where applicable.</li>
+                </ul>
+              </div>
+
+              {/* Section 19 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">19. Guests</h2>
+                <p className="mb-4">Guests agree to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Respect booking terms and premises.</li>
+                  <li>Follow all reasonable Service Provider instructions.</li>
+                  <li>Cover costs for damage caused.</li>
+                  <li>Ensure all travelers meet visa and entry requirements.</li>
+                </ul>
+              </div>
+
+              {/* Section 20 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">20. Reviews</h2>
+                <p className="mb-4">All reviews:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Are genuine and guest-approved.</li>
+                  <li>Are not paid for or edited.</li>
+                </ul>
+              </div>
+
+              {/* Section 21 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">21. Data Security</h2>
+                <p>We do not store or share card details. We use secure systems for data protection.</p>
+              </div>
+
+              {/* Section 22 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">22. Refund Policy</h2>
+                <p>Refunds are processed via the original payment method.</p>
+              </div>
+
+              {/* Section 23 */}
+              <div>
+                <h2 className="text-2xl font-display font-bold text-foreground mb-4">23. Cancellation Policy</h2>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Service Providers choose their cancellation terms: Flexible, Semi-Flexible, Fixed, or Custom.</li>
+                  <li>Retreats Holidays booking fee is non-refundable after 48 hours, but rescheduling may be allowed.</li>
+                  <li>Pending (unconfirmed) bookings may be canceled without penalty.</li>
+                </ul>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Extenuating Circumstances</h3>
+                <p>In rare cases, such as force majeure or last-minute provider cancellations, Guests may cancel their full retreat and receive refunds on all services, including accommodation and activities.</p>
+              </div>
+
+              {/* Contact */}
+              <div className="pt-8 border-t border-border">
+                <p className="text-foreground">
+                  For complaints or urgent matters, contact us directly at{" "}
+                  <a href="mailto:info@retreats-holidays.com" className="text-primary hover:underline">
+                    info@retreats-holidays.com
+                  </a>
                 </p>
               </div>
             </div>

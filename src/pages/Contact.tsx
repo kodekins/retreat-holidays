@@ -64,8 +64,8 @@ const Contact = () => {
                       <MapPin className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-foreground">Jumeirah Lakes towers, Cluster W, JBC5, Dubai, United Arab Emirates</h3>
-                      <p className="text-sm text-muted-foreground">Company Office Address</p>
+                      <h3 className="font-semibold text-foreground">Dubai - Mauritius - Paris - Cairo</h3>
+                      <p className="text-sm text-muted-foreground">Our Global Presence</p>
                     </div>
                   </div>
                 </div>
