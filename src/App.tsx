@@ -10,6 +10,7 @@ import TravelGuideDashboard from "./pages/TravelGuideDashboard";
 import Retreats from "./pages/Retreats";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/about-retreats-holidays" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/travel-guide" element={<TravelGuideLogin />} />
           <Route path="/travel-guide/dashboard" element={<TravelGuideDashboard />} />
           <Route path="*" element={<NotFound />} />

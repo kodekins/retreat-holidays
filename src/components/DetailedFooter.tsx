@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Facebook, Youtube, Instagram, Phone, Mail, MapPin } from "lucide-react";
+import { Facebook, Youtube, Instagram, Mail, MapPin } from "lucide-react";
 
 const DetailedFooter = () => {
   return (
@@ -67,17 +67,10 @@ const DetailedFooter = () => {
             </nav>
           </div>
 
-          {/* Address */}
+          {/* Contact */}
           <div>
-            <h3 className="text-primary font-semibold text-lg mb-6">Address</h3>
+            <h3 className="text-primary font-semibold text-lg mb-6">Contact</h3>
             <div className="space-y-4">
-              <a 
-                href="tel:+23058461923" 
-                className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
-              >
-                <Phone className="w-4 h-4 text-primary flex-shrink-0" />
-                <span>+230 58 46 19 23</span>
-              </a>
               <a 
                 href="mailto:info@retreats-holidays.com" 
                 className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
@@ -87,7 +80,7 @@ const DetailedFooter = () => {
               </a>
               <div className="flex items-start gap-3 text-muted-foreground">
                 <MapPin className="w-4 h-4 text-primary flex-shrink-0 mt-1" />
-                <span>Jumeirah Lakes towers, Cluster W, JBC5, Dubai, United Arab Emirates</span>
+                <span>Dubai - Mauritius - Paris - Cairo</span>
               </div>
             </div>
           </div>
