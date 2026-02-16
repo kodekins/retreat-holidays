@@ -40,7 +40,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Hey there! 👋 I'm Sarah, your personal travel specialist. Whether you're looking for a peaceful yoga retreat, an adventurous holiday, or just need travel advice - I'm here to help! What kind of experience are you dreaming of?",
+      content: "Welcome. I'm Johanna, your CONCIERGE Travel Assistant. Let me craft your perfect retreat or holiday. What's your vision?",
       timestamp: new Date(),
     },
   ]);
@@ -189,7 +189,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {
         id: '1',
         role: 'assistant',
-        content: "Hey there! 👋 I'm Sarah, your personal travel specialist. Whether you're looking for a peaceful yoga retreat, an adventurous holiday, or just need travel advice - I'm here to help! What kind of experience are you dreaming of?",
+        content: "Welcome. I'm Johanna, your CONCIERGE Travel Assistant. Let me craft your perfect retreat or holiday. What's your vision?",
         timestamp: new Date(),
       },
     ]);
@@ -204,15 +204,15 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
-            <img 
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" 
-              alt="Sarah"
+            <img
+              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face"
+              alt="Johanna"
               className="w-full h-full object-cover"
             />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground text-sm">Sarah</h3>
-            <p className="text-xs text-muted-foreground">Travel Specialist</p>
+            <h3 className="font-semibold text-foreground text-sm">Johanna</h3>
+            <p className="text-xs text-muted-foreground">CONCIERGE Specialist</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
