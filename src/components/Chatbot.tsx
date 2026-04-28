@@ -40,7 +40,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     {
       id: '1',
       role: 'assistant',
-      content: "Welcome. I'm Johanna, your CONCIERGE Travel Assistant. Let me craft your perfect retreat or holiday. What's your vision?",
+      content: "Hello, I'm Johanna, your Retreats Concierge Assistant.\n\nWhere are you dreaming of travelling next? Simply share a destination (for example, London, Paris, Bali, or anywhere you love), and I'll offer a refined overview and help shape a holiday perfectly suited to your style.",
       timestamp: new Date(),
     },
   ]);
@@ -189,7 +189,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {
         id: '1',
         role: 'assistant',
-        content: "Welcome. I'm Johanna, your CONCIERGE Travel Assistant. Let me craft your perfect retreat or holiday. What's your vision?",
+        content: "Hello, I'm Johanna, your Retreats Concierge Assistant.\n\n Where are you dreaming of travelling next? Simply share a destination (for example, London, Paris, Bali, or anywhere you love), and I'll offer a refined overview and help shape a holiday perfectly suited to your style.",
         timestamp: new Date(),
       },
     ]);
@@ -205,7 +205,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face"
+              src="travel-assistant.jpeg"
               alt="Johanna"
               className="w-full h-full object-cover"
             />
