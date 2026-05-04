@@ -493,16 +493,64 @@ async function findBestHolidays(query: string, preferences: any): Promise<Travel
   }
 }
 
+function inferTripType(text: string): "holiday" | "retreat" | undefined {
+  const lowerText = text.toLowerCase();
+  const retreatKeywords = ["retreat", "wellness", "yoga", "meditation", "spa", "detox", "healing", "ayurveda", "silent", "wellbeing", "well-being"];
+  const holidayKeywords = ["holiday", "vacation", "tour", "sightseeing", "cruise", "safari", "adventure", "city break", "trip", "escape", "package"];
+  if (retreatKeywords.some(keyword => lowerText.includes(keyword))) return "retreat";
+  if (holidayKeywords.some(keyword => lowerText.includes(keyword))) return "holiday";
+  return undefined;
+}
+
+function parseTravelDate(text: string): string | undefined {
+  const rangeMatch = text.match(/\b(?:from|between)\s+(.+?)\s+(?:to|and)\s+(.+?)\b/i);
+  if (rangeMatch) return `${rangeMatch[1].trim()} to ${rangeMatch[2].trim()}`;
+
+  const monthDayMatch = text.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,\s*\d{4})?\b/i);
+  if (monthDayMatch) return monthDayMatch[0];
+
+  const monthYearMatch = text.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i);
+  if (monthYearMatch) return monthYearMatch[0];
+
+  const numericMatch = text.match(/\b(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/);
+  if (numericMatch) return numericMatch[1];
+
+  const relativeMatch = text.match(/\b(next month|this month|next week|this week|later this year|summer|fall|autumn|winter|spring)\b/i);
+  if (relativeMatch) return relativeMatch[1];
+
+  return undefined;
+}
+
+/** Enough signal to run search: trip shape + place (budget/dates refine later). */
+function isPreferencesComplete(preferences: any): boolean {
+  return Boolean(preferences.tripType && preferences.location);
+}
+
+function getNextPreferenceQuestion(preferences: any): string {
+  if (!preferences.tripType) {
+    return "Are you leaning more toward a retreat (wellness, yoga, that kind of thing) or a classic holiday?";
+  }
+  if (!preferences.location) {
+    return "Nice — where in the world should I look? City, country, or region is perfect.";
+  }
+  return "Tell me a bit more about what you’re after (vibe, how long, rough budget) and I’ll narrow it down.";
+}
+
 // Extract preferences from conversation
 function extractPreferences(messages: any[]): any {
   const allText = messages.filter((m: any) => m.role === "user").map((m: any) => m.content).join(" ");
   const preferences: any = {};
   
   // Budget
-  const budgetMatch = allText.match(/\$?\s*(\d{3,5})\s*(usd|dollars?)?|under\s+\$?(\d+)|budget[:\s]+\$?(\d+)/i);
+  const budgetMatch = allText.match(/\b(?:budget[:\s]*|under\s+|\$)\s*\$?(\d{2,6}(?:,\d{3})?)\b/i)
+    || allText.match(/(\d{3,6})\s*(?:usd|dollars)\b/i)
+    || allText.match(/(\d{3,6})\s*-\s*\d{3,6}/);
   if (budgetMatch) {
-    preferences.budget = budgetMatch[1] || budgetMatch[3] || budgetMatch[4];
+    preferences.budget = budgetMatch[1].replace(/,/g, "");
   }
+
+  // Preferred trip dates
+  preferences.date = parseTravelDate(allText);
   
   // Duration
   const durationMatch = allText.match(/(\d+)\s*(day|night|week)/i);
@@ -539,20 +587,63 @@ function extractPreferences(messages: any[]): any {
   }
 
   // Trip type
-  if (allText.toLowerCase().includes("holiday") || allText.toLowerCase().includes("vacation")) {
-    preferences.tripType = "holiday";
-  } else if (allText.toLowerCase().includes("retreat")) {
-    preferences.tripType = "retreat";
+  const tripType = inferTripType(allText);
+  if (tripType) {
+    preferences.tripType = tripType;
   }
-  
+
+  // Default: if they clearly want a place + retreat cues but never said "holiday", assume retreat
+  if (!preferences.tripType && preferences.location) {
+    const retreatish = /yoga|meditation|wellness|spa|detox|healing|ayurveda|retreat|silent|breathwork|pilates/i.test(
+      allText,
+    );
+    if (retreatish) preferences.tripType = "retreat";
+  }
+
   console.log("Preferences:", preferences);
   return preferences;
 }
 
 // Detect user intent
+function scoreMatch(result: TravelResult, preferences: any): number {
+  let score = 0;
+  const loc = (preferences?.location || "").toLowerCase();
+  if (loc) {
+    const blob = `${result.location || ""} ${result.country || ""} ${result.name || ""}`.toLowerCase();
+    if (blob.includes(loc)) score += 5;
+  }
+  const prefAct = (preferences?.activities || "").toLowerCase();
+  if (prefAct && result.activities?.length) {
+    for (const a of result.activities) {
+      if (prefAct.includes(String(a).toLowerCase())) score += 2;
+    }
+  }
+  if (preferences?.tripType === "retreat" && result.type === "retreat") score += 1;
+  if (preferences?.tripType === "holiday" && result.type === "holiday") score += 1;
+  return score;
+}
+
 function detectIntent(message: string): "greeting" | "search" | "question" | "general" | "need_info" {
   const lowerMsg = message.toLowerCase().trim();
   
+  const hasLocation = [
+    "thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", 
+    "sri lanka", "nepal", "peru", "maldives", "dubai", "hawaii", "italy", "france", "japan"
+  ].some(loc => lowerMsg.includes(loc));
+  
+  const hasActivity = [
+    "yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "beach", "safari"
+  ].some(act => lowerMsg.includes(act));
+  
+  const hasSearchIntent = [
+    "looking for", "find", "search", "show me", "recommend", "suggest", "want", 
+    "need", "book", "interested", "planning", "trip", "travel", "holiday", "vacation", "retreat"
+  ].some(s => lowerMsg.includes(s));
+
+  if (hasSearchIntent && (hasLocation || hasActivity || /retreat|holiday|vacation/.test(lowerMsg))) {
+    return "search";
+  }
+
   const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "hola"];
   if (greetings.some(g => lowerMsg === g || lowerMsg.startsWith(g + " ") || lowerMsg.startsWith(g + ","))) {
     return "greeting";
@@ -568,24 +659,6 @@ function detectIntent(message: string): "greeting" | "search" | "question" | "ge
     return "question";
   }
   
-  const hasLocation = [
-    "thailand", "bali", "india", "costa rica", "mexico", "portugal", "spain", "greece", 
-    "sri lanka", "nepal", "peru", "maldives", "dubai", "hawaii", "italy", "france", "japan"
-  ].some(loc => lowerMsg.includes(loc));
-  
-  const hasActivity = [
-    "yoga", "meditation", "surf", "wellness", "detox", "spiritual", "adventure", "beach", "safari"
-  ].some(act => lowerMsg.includes(act));
-  
-  const hasSearchIntent = [
-    "looking for", "find", "search", "show me", "recommend", "suggest", "want", 
-    "need", "book", "interested", "planning", "trip", "travel", "holiday", "vacation", "retreat"
-  ].some(s => lowerMsg.includes(s));
-  
-  if (hasSearchIntent && (hasLocation || hasActivity)) {
-    return "search";
-  }
-  
   if (hasLocation || hasActivity) {
     return "search";
   }
@@ -597,6 +670,122 @@ function detectIntent(message: string): "greeting" | "search" | "question" | "ge
   return "need_info";
 }
 
+function buildRateLimitFallbackMessage(
+  intent: "greeting" | "search" | "question" | "general" | "need_info",
+  shouldSearch: boolean,
+  nextQuestion: string | undefined,
+  resultCount: number,
+): string {
+  if (shouldSearch && resultCount > 0) {
+    return "I found a few close matches for you below. Pick the one you like most, and I’ll refine from there.";
+  }
+  if (!shouldSearch && nextQuestion) {
+    return `One sec while I reconnect. ${nextQuestion}`;
+  }
+  if (intent === "greeting") {
+    return "Hey, lovely to chat. Are you thinking retreat or holiday?";
+  }
+  return "I’m having a quick delay right now, but I’m here. Tell me your ideal destination and trip style, and I’ll narrow it down fast.";
+}
+
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+/** Free / zero-cost models; first is OpenRouter’s free router, then explicit `:free` variants (fallback chain). */
+const DEFAULT_OPENROUTER_FREE_CHAIN = [
+  "openrouter/free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "qwen/qwen-2.5-7b-instruct:free",
+];
+
+function getOpenRouterModelChain(): string[] {
+  const raw = Deno.env.get("OPENROUTER_MODELS")?.trim();
+  if (raw) {
+    const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    if (list.length > 0) return list;
+  }
+  return [...DEFAULT_OPENROUTER_FREE_CHAIN];
+}
+
+interface ChatMessageOpenAI {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+async function completeChatOpenRouter(
+  apiKey: string,
+  messages: ChatMessageOpenAI[],
+): Promise<{ content: string; modelUsed: string }> {
+  const referer = Deno.env.get("OPENROUTER_HTTP_REFERER") || "https://localhost";
+  const title = Deno.env.get("OPENROUTER_APP_NAME") || "Retreat Holidays Chat";
+  const modelChain = getOpenRouterModelChain();
+  let lastError = "";
+  let saw429 = false;
+
+  for (const model of modelChain) {
+    let res: Response;
+    try {
+      res = await fetch(OPENROUTER_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": referer,
+          "X-Title": title,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.7,
+          max_tokens: 600,
+        }),
+      });
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      console.error("OpenRouter fetch failed:", model, lastError);
+      continue;
+    }
+
+    const raw = await res.text();
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      lastError = `Invalid JSON (${res.status}): ${raw.slice(0, 240)}`;
+      console.error("OpenRouter non-JSON:", model, lastError);
+      continue;
+    }
+
+    if (!res.ok) {
+      const errObj = data?.error as { message?: string } | undefined;
+      const msg = errObj?.message || (typeof data?.message === "string" ? data.message : raw.slice(0, 280));
+      lastError = `${res.status}: ${msg}`;
+      console.error("OpenRouter HTTP error:", model, lastError);
+      if (res.status === 401) {
+        throw new Error(`OpenRouter authentication failed. Check OPENROUTER_API_KEY. ${msg}`);
+      }
+      if (res.status === 429) saw429 = true;
+      continue;
+    }
+
+    const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
+    const content = choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      lastError = "Empty model response";
+      console.error("OpenRouter empty content:", model, JSON.stringify(data).slice(0, 400));
+      continue;
+    }
+
+    const modelUsed = typeof data?.model === "string" ? data.model : model;
+    console.log("OpenRouter success:", model, "resolved:", modelUsed);
+    return { content, modelUsed };
+  }
+
+  if (saw429) {
+    throw new Error("OpenRouter rate limit on free models — try again in a minute or set OPENROUTER_MODELS to a specific :free model.");
+  }
+  throw new Error(`OpenRouter: all fallback models failed. Last: ${lastError}`);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -604,10 +793,11 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")?.trim();
+    if (!OPENROUTER_API_KEY) {
+      throw new Error(
+        "OPENROUTER_API_KEY is not configured. Add it in Supabase: Project Settings → Edge Functions → Secrets (or supabase secrets set OPENROUTER_API_KEY=...).",
+      );
     }
 
     console.log("Processing chat with", messages.length, "messages");
@@ -619,101 +809,88 @@ serve(async (req) => {
     console.log("Intent:", intent, "Query:", userQuery.substring(0, 50));
 
     let allResults: TravelResult[] = [];
-    
-    // Only search if intent is search
-    if (intent === "search") {
-      const preferences = extractPreferences(messages);
-      
-      const isHolidaySearch = preferences.tripType === "holiday" || 
-        userQuery.toLowerCase().includes("holiday") || 
-        userQuery.toLowerCase().includes("vacation");
-      
-      const isRetreatSearch = preferences.tripType === "retreat" || 
-        userQuery.toLowerCase().includes("retreat") || 
-        userQuery.toLowerCase().includes("yoga") ||
-        userQuery.toLowerCase().includes("meditation") ||
-        userQuery.toLowerCase().includes("wellness");
+    const preferences = extractPreferences(messages);
+    const hasCompletePreferences = isPreferencesComplete(preferences);
+    const nextQuestion = hasCompletePreferences ? undefined : getNextPreferenceQuestion(preferences);
+    const shouldSearch = hasCompletePreferences;
 
-      // First check curated retreats
-      const curatedResults = await searchCuratedRetreats(preferences);
-      
+    const isHolidaySearch = preferences.tripType === "holiday" || 
+      userQuery.toLowerCase().includes("holiday") || 
+      userQuery.toLowerCase().includes("vacation");
+    
+    const isRetreatSearch = preferences.tripType === "retreat" || 
+      userQuery.toLowerCase().includes("retreat") || 
+      userQuery.toLowerCase().includes("yoga") ||
+      userQuery.toLowerCase().includes("meditation") ||
+      userQuery.toLowerCase().includes("wellness");
+
+    if (shouldSearch) {
       if (isHolidaySearch) {
-        // Search for holidays
         const holidayResults = await findBestHolidays(userQuery, preferences);
         allResults = holidayResults;
         console.log("Holiday search results:", allResults.length);
       } else if (isRetreatSearch) {
-        // Combine curated and scraped retreats
+        const curatedResults = await searchCuratedRetreats(preferences);
         const scrapedRetreats = await findBestRetreats(userQuery, preferences);
         allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
         console.log("Retreat search results:", allResults.length);
       } else {
-        // Default to retreats
-        allResults = curatedResults.slice(0, 10);
-        if (allResults.length < 10) {
-          const scrapedRetreats = await findBestRetreats(userQuery, preferences);
-          allResults = [...allResults, ...scrapedRetreats].slice(0, 10);
-        }
-        console.log("Default search results:", allResults.length);
+        const curatedResults = await searchCuratedRetreats(preferences);
+        const scrapedRetreats = await findBestRetreats(userQuery, preferences);
+        allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
+        console.log("Default retreat search results:", allResults.length);
       }
     }
 
-    // Build system prompt
-    let systemPrompt = `You are Johanna, a luxury CONCIERGE Travel Assistant. Be decisive, elegant, and conversion-focused. Keep responses SHORT (1-2 sentences max).
+    if (allResults.length > 1) {
+      allResults = [...allResults].sort(
+        (a, b) => scoreMatch(b, preferences) - scoreMatch(a, preferences),
+      );
+    }
+
+    // Build system prompt — sound like a warm human concierge, not a brochure
+    let systemPrompt = `You are Johanna, a friendly travel concierge on chat. Write like a real person: short, natural, warm. No bullet lists, no corporate fluff, no em dashes. Usually 1–2 short sentences. Never say you are an AI.
 
 `;
 
     if (intent === "greeting") {
-      systemPrompt += `User just greeted you. Elegantly greet back and ask about their travel vision - retreat or holiday? Be concise and convert-focused. Max 2 sentences.`;
+      systemPrompt += `They just said hi (or similar). Greet back in a human way — you already introduced yourself in the app, so don’t re-introduce. Ask one thing: retreat or holiday, or where they’re dreaming of. One short paragraph max.`;
     } else if (intent === "general") {
-      systemPrompt += `User asking a general question. Answer briefly and redirect to travel planning if possible. Max 2 sentences.`;
+      systemPrompt += `Quick, helpful reply. If it’s not about travel, answer briefly and gently steer back to planning a trip.`;
     } else if (intent === "question") {
-      systemPrompt += `User asking an informational question. Answer concisely and offer travel planning assistance. Max 2 sentences.`;
-    } else if (intent === "need_info") {
-      systemPrompt += `User wants to find something but needs guidance. Ask decisively about their destination or experience preference. Max 1-2 sentences.`;
-    } else if (intent === "search" && allResults.length > 0) {
-      systemPrompt += `Found ${allResults.length} exceptional options! Say ONLY: "Here are the ${allResults.length} finest options for your consideration:" - nothing else. The cards show all details.`;
-    } else if (intent === "search" && allResults.length === 0) {
-      systemPrompt += `Couldn't find exact matches. Suggest an alternative destination or refine their preferences elegantly. Max 2 sentences.`;
+      systemPrompt += `Answer simply. Then one line offering to help them pick a retreat or holiday if they want.`;
+    } else if (!shouldSearch) {
+      systemPrompt += `You’re still learning what they want. Ask ONLY this, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message.`;
+    } else if (allResults.length > 0) {
+      systemPrompt += `You found ${allResults.length} options shown as cards below. Say something brief and human — like you’re texting — e.g. that these are the closest matches and they can tap for more detail. Don’t list titles or prices in text (the cards show that). Max 2 sentences.`;
+    } else {
+      systemPrompt += `No good matches this round. Say so kindly in one or two short sentences, and ask one thing to try again (different place, dates, or budget).`;
     }
 
-    // Call AI
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-      }),
-    });
+    const chatMessages: ChatMessageOpenAI[] = [
+      { role: "system", content: systemPrompt },
+      ...(messages as ChatMessageOpenAI[]),
+    ];
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    let content: string;
+    try {
+      const out = await completeChatOpenRouter(OPENROUTER_API_KEY, chatMessages);
+      content = out.content;
+    } catch (aiErr) {
+      const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
+      if (msg.includes("rate limit")) {
+        console.warn("OpenRouter rate-limited, using local fallback message.");
+        content = buildRateLimitFallbackMessage(intent, shouldSearch, nextQuestion, allResults.length);
+      } else {
+        throw aiErr;
       }
-      
-      throw new Error(`AI error: ${aiResponse.status}`);
     }
 
-    const data = await aiResponse.json();
-    const content = data.choices?.[0]?.message?.content || "I'd love to help you find the perfect experience!";
-    
     console.log("Response:", content.substring(0, 50), "Results:", allResults.length);
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       content,
-      retreats: allResults
+      retreats: allResults,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -3,9 +3,9 @@ import { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Retreat } from '@/types/retreat';
 import RetreatCard from './RetreatCard';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -36,11 +36,14 @@ interface APIRetreat {
 
 const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps) => {
   const { toast } = useToast();
+  const initialGreeting =
+    "Hi, I'm Johanna — I help people find retreats and holidays that actually fit them. Where would you love to go, or what kind of trip are you picturing?";
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: "Hello, I'm Johanna, your Retreats Concierge Assistant.\n\nWhere are you dreaming of travelling next? Simply share a destination (for example, London, Paris, Bali, or anywhere you love), and I'll offer a refined overview and help shape a holiday perfectly suited to your style.",
+      content: initialGreeting,
       timestamp: new Date(),
     },
   ]);
@@ -125,11 +128,30 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     ];
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { messages: newConversationHistory }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const jwtKey =
+        import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !jwtKey) {
+        throw new Error(
+          'Missing Supabase env. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (JWT from Dashboard → API → anon public). Publishable keys cannot be used as Bearer tokens for Edge Functions.',
+        );
+      }
+      if (!import.meta.env.VITE_SUPABASE_ANON_KEY && jwtKey.startsWith('sb_publishable_')) {
+        throw new Error(
+          'Add VITE_SUPABASE_ANON_KEY to .env (Supabase Dashboard → Project Settings → API → anon public). The publishable key is not a valid JWT for ai-chat.',
+        );
+      }
+
+      const { data, error: fnError } = await supabase.functions.invoke('ai-chat', {
+        body: { messages: newConversationHistory },
       });
 
-      if (error) throw error;
+      if (fnError) {
+        throw new Error(fnError.message || 'AI function request failed');
+      }
+      if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
+        throw new Error((data as { error: string }).error);
+      }
 
       const aiContent = data?.content || "Here are some great retreat options for you!";
       
@@ -189,7 +211,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {
         id: '1',
         role: 'assistant',
-        content: "Hello, I'm Johanna, your Retreats Concierge Assistant.\n\n Where are you dreaming of travelling next? Simply share a destination (for example, London, Paris, Bali, or anywhere you love), and I'll offer a refined overview and help shape a holiday perfectly suited to your style.",
+        content: initialGreeting,
         timestamp: new Date(),
       },
     ]);
