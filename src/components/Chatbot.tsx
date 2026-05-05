@@ -37,7 +37,7 @@ interface APIRetreat {
 const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps) => {
   const { toast } = useToast();
   const initialGreeting =
-    "Hi, I'm Johanna — I help people find retreats and holidays that actually fit them. Where would you love to go, or what kind of trip are you picturing?";
+    "Your Retreat and Holiday Assistant. How are you doing today?";
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -223,9 +223,9 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
   return (
     <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[600px] max-h-[80vh] bg-background rounded-2xl shadow-xl border border-border flex flex-col overflow-hidden animate-slide-up">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/30">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
+      <div className="flex items-center justify-between p-5 border-b border-border bg-secondary/30">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
             <img
               src="travel-assistant.jpeg"
               alt="Johanna"
@@ -233,8 +233,8 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
             />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground text-sm">Johanna</h3>
-            <p className="text-xs text-muted-foreground">CONCIERGE Specialist</p>
+            <h3 className="font-semibold text-foreground text-lg">Johanna</h3>
+            <p className="text-sm text-muted-foreground">CONCIERGE Specialist</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
