@@ -19,9 +19,24 @@ Retreats Holidays is a wellness travel platform focused on curated retreats and 
 
 ## Canonical pages
 - https://retreats-holidays.com/
+- https://retreats-holidays.com/gcc
+- https://retreats-holidays.com/ar/gcc
+- https://retreats-holidays.com/ar/retreats/saudi-arabia
+- https://retreats-holidays.com/ar/retreats/uae
+- https://retreats-holidays.com/ar/retreats/qatar
+- https://retreats-holidays.com/ar/retreats/kuwait
+- https://retreats-holidays.com/ar/retreats/oman
+- https://retreats-holidays.com/ar/retreats/egypt
+- https://retreats-holidays.com/retreats/saudi-arabia
+- https://retreats-holidays.com/retreats/uae
+- https://retreats-holidays.com/retreats/qatar
+- https://retreats-holidays.com/retreats/kuwait
+- https://retreats-holidays.com/retreats/oman
+- https://retreats-holidays.com/retreats/egypt
 - https://retreats-holidays.com/our-exclusive-retreats
 - https://retreats-holidays.com/about-retreats-holidays
 - https://retreats-holidays.com/contact
+- https://retreats-holidays.com/blog
 
 ## Contact
 - Email: info@retreats-holidays.com
