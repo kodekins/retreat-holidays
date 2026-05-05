@@ -1,0 +1,27 @@
+# Retreats Holidays
+
+Retreats Holidays is a wellness travel platform focused on curated retreats and holiday experiences.
+
+## Primary audience
+- Travelers in Saudi Arabia
+- Travelers in UAE and Dubai
+- Travelers in Qatar
+- Travelers in Kuwait
+- Travelers in Oman
+- Travelers in Egypt
+
+## Key offerings
+- Yoga retreats
+- Wellness holidays
+- Adventure retreats
+- AI-assisted retreat discovery
+- Personalized retreat booking support
+
+## Canonical pages
+- https://retreats-holidays.com/
+- https://retreats-holidays.com/our-exclusive-retreats
+- https://retreats-holidays.com/about-retreats-holidays
+- https://retreats-holidays.com/contact
+
+## Contact
+- Email: info@retreats-holidays.com

@@ -11,6 +11,7 @@ import Retreats from "./pages/Retreats";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
+import SeoManager from "./components/SeoManager";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <SeoManager />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/retreats" element={<Retreats />} />
