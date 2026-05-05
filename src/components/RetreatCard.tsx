@@ -18,8 +18,9 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(({ retreat, onB
         <img
           src={retreat.image}
           alt={retreat.name}
-          className="w-full h-36 object-cover"
+          className="w-full h-36 object-cover blur-[1.5px] scale-[1.02]"
         />
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" />
         <div className="absolute bottom-2 right-2">
           <span className="bg-background/90 backdrop-blur-sm text-xs px-2 py-1 rounded-full text-foreground font-medium">
             {retreat.duration}
@@ -28,11 +29,11 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(({ retreat, onB
       </div>
       
       <div className="p-3">
-        <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2 font-display">
+        <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2 font-display blur-[0.5px]">
           {retreat.name}
         </h4>
         
-        <ul className="text-xs text-muted-foreground space-y-0.5 mb-2">
+        <ul className="text-xs text-muted-foreground space-y-0.5 mb-2 blur-[0.5px]">
           <li>
             <span className="font-medium text-foreground">Location:</span> {retreat.location}, {retreat.country}
           </li>
@@ -44,7 +45,7 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(({ retreat, onB
           </li>
         </ul>
         
-        <p className="text-xs text-muted-foreground line-clamp-3 mb-3">
+        <p className="text-xs text-muted-foreground line-clamp-3 mb-3 blur-[0.5px]">
           <span className="font-medium text-foreground">Details:</span> {retreat.description}
         </p>
         
@@ -53,7 +54,7 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(({ retreat, onB
             onClick={() => onBook(retreat)}
             className="flex-1 bg-primary text-primary-foreground text-xs py-2 px-3 rounded-md font-medium hover:bg-primary-dark transition-colors"
           >
-            Book Now
+            Pay to Get Details
           </button>
           <button
             onClick={() => onWhatsApp(retreat)}

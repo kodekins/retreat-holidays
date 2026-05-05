@@ -380,12 +380,14 @@ async function findBestRetreats(query: string, preferences: any): Promise<Travel
 
   try {
     const searchTerms = [];
+    if (query) searchTerms.push(query);
     if (preferences?.location) searchTerms.push(preferences.location);
     if (preferences?.activities) searchTerms.push(preferences.activities);
     if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
+    if (preferences?.date) searchTerms.push(preferences.date);
     searchTerms.push("retreat");
     
-    const fullQuery = `(site:bookretreats.com/r/ OR site:bookyogaretreats.com) ${searchTerms.join(" ")}`;
+    const fullQuery = `(site:bookretreats.com OR site:bookyogaretreats.com) ${searchTerms.join(" ")}`;
     
     console.log("Searching for retreats:", fullQuery);
 
@@ -413,7 +415,10 @@ async function findBestRetreats(query: string, preferences: any): Promise<Travel
 
     const retreatPages = results.filter((r: any) => {
       const url = r.url || "";
-      return (url.includes("/r/") || url.includes("bookyogaretreats.com")) && 
+      return (url.includes("bookretreats.com") || url.includes("bookyogaretreats.com")) &&
+             !url.includes("/blog") &&
+             !url.includes("/about") &&
+             !url.includes("/contact") &&
              !url.includes("/search") && 
              !url.includes("/s/") && 
              !url.includes("?q=");
@@ -518,12 +523,22 @@ function parseTravelDate(text: string): string | undefined {
   const relativeMatch = text.match(/\b(next month|this month|next week|this week|later this year|summer|fall|autumn|winter|spring)\b/i);
   if (relativeMatch) return relativeMatch[1];
 
+  const weekdayMatch = text.match(/\b(this|next)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+  if (weekdayMatch) return `${(weekdayMatch[1] || "").trim()} ${weekdayMatch[2]}`.trim();
+
+  const quickMatch = text.match(/\b(today|tomorrow|weekend)\b/i);
+  if (quickMatch) return quickMatch[1];
+
   return undefined;
 }
 
-/** Enough signal to run search: trip shape + place (budget/dates refine later). */
+/** Required details before searching: trip type + place + date (budget improves ranking). */
 function isPreferencesComplete(preferences: any): boolean {
-  return Boolean(preferences.tripType && preferences.location);
+  return Boolean(
+    preferences.tripType &&
+    preferences.location &&
+    preferences.date,
+  );
 }
 
 function getNextPreferenceQuestion(preferences: any): string {
@@ -533,7 +548,13 @@ function getNextPreferenceQuestion(preferences: any): string {
   if (!preferences.location) {
     return "Nice — where in the world should I look? City, country, or region is perfect.";
   }
-  return "Tell me a bit more about what you’re after (vibe, how long, rough budget) and I’ll narrow it down.";
+  if (!preferences.date) {
+    return "Great. What dates or month are you planning for this trip?";
+  }
+  if (!preferences.budget) {
+    return "Great choice. Do you have a rough budget per person so I can narrow this down better?";
+  }
+  return "Tell me a bit more about your preferred vibe or activities, and I will lock in the closest match.";
 }
 
 // Extract preferences from conversation
@@ -620,6 +641,23 @@ function scoreMatch(result: TravelResult, preferences: any): number {
   }
   if (preferences?.tripType === "retreat" && result.type === "retreat") score += 1;
   if (preferences?.tripType === "holiday" && result.type === "holiday") score += 1;
+  if (preferences?.budget && Number.isFinite(result.price)) {
+    const budget = Number(preferences.budget);
+    const delta = Math.abs(budget - result.price);
+    if (result.price <= budget) {
+      score += 4;
+      if (delta <= budget * 0.15) score += 2;
+    } else if (result.price <= budget * 1.2) {
+      score += 1;
+    } else {
+      score -= 2;
+    }
+  }
+  const hasRealImage =
+    Boolean(result.image) &&
+    !String(result.image).includes("images.unsplash.com");
+  if (hasRealImage) score += 3;
+  else score -= 1;
   return score;
 }
 
@@ -840,12 +878,27 @@ serve(async (req) => {
         allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
         console.log("Default retreat search results:", allResults.length);
       }
+
+      // If strict filters produced nothing, widen search to avoid "no match" dead ends.
+      if (allResults.length === 0) {
+        const relaxedPreferences = { ...preferences };
+        delete relaxedPreferences.budget;
+        const relaxedCurated = await searchCuratedRetreats(relaxedPreferences);
+        const relaxedScraped = await findBestRetreats(preferences.location || userQuery, relaxedPreferences);
+        allResults = [...relaxedCurated, ...relaxedScraped].slice(0, 10);
+        console.log("Relaxed fallback search results:", allResults.length);
+      }
     }
 
     if (allResults.length > 1) {
       allResults = [...allResults].sort(
         (a, b) => scoreMatch(b, preferences) - scoreMatch(a, preferences),
       );
+    }
+
+    // Return only the single closest match card once details are complete.
+    if (shouldSearch && allResults.length > 0) {
+      allResults = [allResults[0]];
     }
 
     // Build system prompt — sound like a warm human concierge, not a brochure
@@ -862,7 +915,7 @@ serve(async (req) => {
     } else if (!shouldSearch) {
       systemPrompt += `You’re still learning what they want. Ask ONLY this, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message.`;
     } else if (allResults.length > 0) {
-      systemPrompt += `You found ${allResults.length} options shown as cards below. Say something brief and human — like you’re texting — e.g. that these are the closest matches and they can tap for more detail. Don’t list titles or prices in text (the cards show that). Max 2 sentences.`;
+      systemPrompt += `You found the closest single match shown as a card below. Keep it brief and human: say this is the best match for their requirements and ask if they want alternatives too. Don’t list title or price in text (card already shows it). Max 2 sentences.`;
     } else {
       systemPrompt += `No good matches this round. Say so kindly in one or two short sentences, and ask one thing to try again (different place, dates, or budget).`;
     }
