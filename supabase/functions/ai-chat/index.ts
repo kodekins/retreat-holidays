@@ -20,6 +20,7 @@ interface TravelResult {
   url?: string;
   image?: string;
   category?: string;
+  dates?: string | null;
   type: "retreat" | "holiday" | "experience";
 }
 
@@ -54,7 +55,7 @@ function getFallbackImage(item: any): string {
   return fallbackImages.default;
 }
 
-// Search curated retreats from database
+// Optional: curated retreats from database (supplement to scraping)
 async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -67,6 +68,8 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
     let query = supabase
       .from("curated_retreats")
       .select("*")
+      .not("booking_url", "is", null)
+      .neq("booking_url", "")
       .order("featured", { ascending: false });
 
     if (preferences?.budget) {
@@ -77,31 +80,52 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
       query = query.or(`location.ilike.%${loc}%,country.ilike.%${loc}%`);
     }
 
-    const { data, error } = await query.limit(5);
+    const { data, error } = await query.limit(20);
 
     if (error) {
-      console.error("Curated retreats error:", error);
+      console.error("Verified provider search error:", error);
       return [];
     }
 
-    return (data || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      location: r.location,
-      country: r.country,
-      duration: r.duration,
-      price: Number(r.price),
-      currency: r.currency || "USD",
-      description: r.description,
-      activities: r.activities || [],
-      source: "Curated Collection",
-      url: r.booking_url,
-      image: r.image_url || getFallbackImage(r),
-      category: r.category,
-      type: "retreat" as const,
-    }));
+    const holidayCategories = ["adventure", "surf", "cultural"];
+    const retreatCategories = ["yoga", "meditation", "wellness", "detox", "spiritual", "ayurveda", "healing", "silent"];
+
+    const mapped = (data || [])
+      .filter((r: any) => r.booking_url?.trim())
+      .map((r: any) => {
+        const category = String(r.category || "").toLowerCase();
+        const isHoliday = holidayCategories.some((c) => category.includes(c));
+        return {
+          id: r.id,
+          name: r.name,
+          location: r.location,
+          country: r.country,
+          duration: r.duration,
+          price: Number(r.price),
+          currency: r.currency || "USD",
+          description: r.description,
+          activities: r.activities || [],
+          source: "Verified Provider",
+          url: r.booking_url,
+          image: r.image_url || getFallbackImage(r),
+          category: r.category,
+          dates: r.dates ?? null,
+          type: (isHoliday ? "holiday" : "retreat") as "retreat" | "holiday",
+        };
+      });
+
+    if (preferences?.tripType === "holiday") {
+      const holidays = mapped.filter((r) => r.type === "holiday");
+      if (holidays.length > 0) return holidays;
+    }
+    if (preferences?.tripType === "retreat") {
+      const retreats = mapped.filter((r) => r.type === "retreat");
+      if (retreats.length > 0) return retreats;
+    }
+
+    return mapped;
   } catch (error) {
-    console.error("Curated search error:", error);
+    console.error("Verified provider search error:", error);
     return [];
   }
 }
@@ -379,7 +403,7 @@ async function findBestRetreats(query: string, preferences: any): Promise<Travel
   if (!FIRECRAWL_API_KEY) return [];
 
   try {
-    const searchTerms = [];
+    const searchTerms: string[] = [];
     if (query) searchTerms.push(query);
     if (preferences?.location) searchTerms.push(preferences.location);
     if (preferences?.activities) searchTerms.push(preferences.activities);
@@ -451,7 +475,7 @@ async function findBestHolidays(query: string, preferences: any): Promise<Travel
   if (!FIRECRAWL_API_KEY) return [];
 
   try {
-    const searchTerms = [];
+    const searchTerms: string[] = [];
     if (preferences?.location) searchTerms.push(preferences.location);
     searchTerms.push("holiday vacation package tour");
     if (preferences?.duration) searchTerms.push(`${preferences.duration} day`);
@@ -554,7 +578,7 @@ function getNextPreferenceQuestion(preferences: any): string {
   if (!preferences.budget) {
     return "Great choice. Do you have a rough budget per person so I can narrow this down better?";
   }
-  return "Tell me a bit more about your preferred vibe or activities, and I will lock in the closest match.";
+  return "Any must-have activities or vibe (for example yoga, spa, beach, adventure), and how many days?";
 }
 
 // Extract preferences from conversation
@@ -606,6 +630,31 @@ function extractPreferences(messages: any[]): any {
   if (foundActivities.length > 0) {
     preferences.activities = foundActivities.join(" ");
   }
+
+  // Accommodation preference (lightweight extraction)
+  const accommodation = [
+    "private room",
+    "shared room",
+    "villa",
+    "resort",
+    "hotel",
+    "boutique",
+    "eco",
+    "glamping",
+    "luxury",
+  ];
+  const foundAcc = accommodation.find((a) => allText.toLowerCase().includes(a));
+  if (foundAcc) preferences.accommodation = foundAcc;
+
+  // Dietary requirements (lightweight extraction)
+  const dietary = ["vegan", "vegetarian", "gluten free", "halal", "kosher", "dairy free"];
+  const foundDiet = dietary.filter((d) => allText.toLowerCase().includes(d));
+  if (foundDiet.length) preferences.dietary = foundDiet.join(", ");
+
+  // Group type
+  if (/\bsolo\b/i.test(allText)) preferences.groupType = "solo";
+  if (/\bcouple|honeymoon\b/i.test(allText)) preferences.groupType = "couple";
+  if (/\bfamily|kids?\b/i.test(allText)) preferences.groupType = "family";
 
   // Trip type
   const tripType = inferTripType(allText);
@@ -715,7 +764,7 @@ function buildRateLimitFallbackMessage(
   resultCount: number,
 ): string {
   if (shouldSearch && resultCount > 0) {
-    return "I found a few close matches for you below. Pick the one you like most, and I’ll refine from there.";
+    return "I found a real provider match for you below. Pay the 5% concierge fee to get their official booking link.";
   }
   if (!shouldSearch && nextQuestion) {
     return `One sec while I reconnect. ${nextQuestion}`;
@@ -726,22 +775,11 @@ function buildRateLimitFallbackMessage(
   return "I’m having a quick delay right now, but I’m here. Tell me your ideal destination and trip style, and I’ll narrow it down fast.";
 }
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
-/** Free / zero-cost models; first is OpenRouter’s free router, then explicit `:free` variants (fallback chain). */
-const DEFAULT_OPENROUTER_FREE_CHAIN = [
-  "openrouter/free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "qwen/qwen-2.5-7b-instruct:free",
-];
-
-function getOpenRouterModelChain(): string[] {
-  const raw = Deno.env.get("OPENROUTER_MODELS")?.trim();
-  if (raw) {
-    const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
-    if (list.length > 0) return list;
-  }
-  return [...DEFAULT_OPENROUTER_FREE_CHAIN];
+function getOpenAIModel(): string {
+  // Allow override via secrets. Safe default.
+  return Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini";
 }
 
 interface ChatMessageOpenAI {
@@ -749,79 +787,123 @@ interface ChatMessageOpenAI {
   content: string;
 }
 
-async function completeChatOpenRouter(
+function titleCase(s: string): string {
+  return s
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function formatMoney(amount: number, currency: string): string {
+  if (!Number.isFinite(amount) || amount <= 0) return "Not provided";
+  const cur = (currency || "USD").toUpperCase();
+  return `${cur} ${Math.round(amount).toLocaleString()}`;
+}
+
+function formatActivities(acts: string[]): string {
+  const list = (acts || []).filter(Boolean).slice(0, 6);
+  if (list.length === 0) return "Not provided";
+  return list.join(", ");
+}
+
+function premiumSingleMatchMessage(result: TravelResult, preferences: Record<string, unknown>): string {
+  const typeLabel = result.type === "holiday" ? "Holiday" : "Retreat";
+  const budget = typeof preferences.budget === "string" ? preferences.budget : undefined;
+  const date = typeof preferences.date === "string" ? preferences.date : undefined;
+  const durationPref = typeof preferences.duration === "string" ? preferences.duration : undefined;
+  const activityPref = typeof preferences.activities === "string" ? preferences.activities : undefined;
+
+  const whyBits: string[] = [];
+  if (preferences.location) whyBits.push(`it’s in ${String(preferences.location)}`);
+  if (budget && Number.isFinite(result.price)) whyBits.push("it’s close to your budget");
+  if (activityPref && result.activities?.length) whyBits.push(`it aligns with ${activityPref}`);
+  if (durationPref) whyBits.push(`it fits your timing (${durationPref} days)`);
+  if (whyBits.length === 0) whyBits.push("it’s the closest match to what you asked for");
+
+  const bestTime = date ? `Based on your dates: ${date}` : "Not provided in listing";
+  const bookingLink = result.url ? result.url : "Not provided";
+
+  return `✨ Your Perfect Match
+
+🏝 Retreat/Holiday Name:
+${result.name || `${titleCase(result.location || "Destination")} ${typeLabel}`}
+
+📍 Location:
+${[result.location, result.country].filter(Boolean).join(", ") || "Not provided"}
+
+💰 Price:
+${formatMoney(result.price, result.currency)}
+
+🕒 Duration:
+${result.duration || "Not provided"}
+
+🏡 Accommodation:
+Not provided in listing
+
+🌟 Main Activities:
+${formatActivities(result.activities || [])}
+
+⭐ Rating:
+Not provided in listing
+
+💡 Why This Matches You:
+${whyBits.join(", ")}.
+
+🌤 Best Time To Visit:
+${bestTime}
+
+🔗 Booking Link:
+${bookingLink}`.trim();
+}
+
+async function completeChatOpenAI(
   apiKey: string,
   messages: ChatMessageOpenAI[],
 ): Promise<{ content: string; modelUsed: string }> {
-  const referer = Deno.env.get("OPENROUTER_HTTP_REFERER") || "https://localhost";
-  const title = Deno.env.get("OPENROUTER_APP_NAME") || "Retreat Holidays Chat";
-  const modelChain = getOpenRouterModelChain();
-  let lastError = "";
-  let saw429 = false;
+  const model = getOpenAIModel();
+  const res = await fetch(OPENAI_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 600,
+    }),
+  });
 
-  for (const model of modelChain) {
-    let res: Response;
-    try {
-      res = await fetch(OPENROUTER_API_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": referer,
-          "X-Title": title,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.7,
-          max_tokens: 600,
-        }),
-      });
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
-      console.error("OpenRouter fetch failed:", model, lastError);
-      continue;
-    }
-
-    const raw = await res.text();
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      lastError = `Invalid JSON (${res.status}): ${raw.slice(0, 240)}`;
-      console.error("OpenRouter non-JSON:", model, lastError);
-      continue;
-    }
-
-    if (!res.ok) {
-      const errObj = data?.error as { message?: string } | undefined;
-      const msg = errObj?.message || (typeof data?.message === "string" ? data.message : raw.slice(0, 280));
-      lastError = `${res.status}: ${msg}`;
-      console.error("OpenRouter HTTP error:", model, lastError);
-      if (res.status === 401) {
-        throw new Error(`OpenRouter authentication failed. Check OPENROUTER_API_KEY. ${msg}`);
-      }
-      if (res.status === 429) saw429 = true;
-      continue;
-    }
-
-    const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
-    const content = choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      lastError = "Empty model response";
-      console.error("OpenRouter empty content:", model, JSON.stringify(data).slice(0, 400));
-      continue;
-    }
-
-    const modelUsed = typeof data?.model === "string" ? data.model : model;
-    console.log("OpenRouter success:", model, "resolved:", modelUsed);
-    return { content, modelUsed };
+  const raw = await res.text();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new Error(`OpenAI invalid JSON (${res.status}): ${raw.slice(0, 240)}`);
   }
 
-  if (saw429) {
-    throw new Error("OpenRouter rate limit on free models — try again in a minute or set OPENROUTER_MODELS to a specific :free model.");
+  if (!res.ok) {
+    const errObj = data?.error as { message?: string; type?: string } | undefined;
+    const msg = errObj?.message || raw.slice(0, 280);
+    if (res.status === 401) {
+      throw new Error(`OpenAI authentication failed. Check OPENAI_API_KEY. ${msg}`);
+    }
+    if (res.status === 429) {
+      throw new Error(`OpenAI rate limit reached. ${msg}`);
+    }
+    throw new Error(`OpenAI error ${res.status}: ${msg}`);
   }
-  throw new Error(`OpenRouter: all fallback models failed. Last: ${lastError}`);
+
+  const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
+  const content = choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error("OpenAI: empty model response");
+  }
+
+  const modelUsed = typeof data?.model === "string" ? data.model : model;
+  return { content, modelUsed };
 }
 
 serve(async (req) => {
@@ -831,10 +913,10 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")?.trim();
-    if (!OPENROUTER_API_KEY) {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")?.trim();
+    if (!OPENAI_API_KEY) {
       throw new Error(
-        "OPENROUTER_API_KEY is not configured. Add it in Supabase: Project Settings → Edge Functions → Secrets (or supabase secrets set OPENROUTER_API_KEY=...).",
+        "OPENAI_API_KEY is not configured. Add it in Supabase: Project Settings → Edge Functions → Secrets (or supabase secrets set OPENAI_API_KEY=...).",
       );
     }
 
@@ -864,29 +946,30 @@ serve(async (req) => {
 
     if (shouldSearch) {
       if (isHolidaySearch) {
-        const holidayResults = await findBestHolidays(userQuery, preferences);
-        allResults = holidayResults;
-        console.log("Holiday search results:", allResults.length);
+        allResults = await findBestHolidays(userQuery, preferences);
+        console.log("Holiday scrape results:", allResults.length);
       } else if (isRetreatSearch) {
         const curatedResults = await searchCuratedRetreats(preferences);
         const scrapedRetreats = await findBestRetreats(userQuery, preferences);
-        allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
-        console.log("Retreat search results:", allResults.length);
+        allResults = [...curatedResults, ...scrapedRetreats];
+        console.log("Retreat results (curated + scraped):", allResults.length);
       } else {
         const curatedResults = await searchCuratedRetreats(preferences);
         const scrapedRetreats = await findBestRetreats(userQuery, preferences);
-        allResults = [...curatedResults, ...scrapedRetreats].slice(0, 10);
-        console.log("Default retreat search results:", allResults.length);
+        allResults = [...curatedResults, ...scrapedRetreats];
+        console.log("Default retreat results (curated + scraped):", allResults.length);
       }
 
-      // If strict filters produced nothing, widen search to avoid "no match" dead ends.
       if (allResults.length === 0) {
         const relaxedPreferences = { ...preferences };
         delete relaxedPreferences.budget;
         const relaxedCurated = await searchCuratedRetreats(relaxedPreferences);
-        const relaxedScraped = await findBestRetreats(preferences.location || userQuery, relaxedPreferences);
-        allResults = [...relaxedCurated, ...relaxedScraped].slice(0, 10);
-        console.log("Relaxed fallback search results:", allResults.length);
+        const relaxedScraped = await findBestRetreats(
+          preferences.location || userQuery,
+          relaxedPreferences,
+        );
+        allResults = [...relaxedCurated, ...relaxedScraped];
+        console.log("Relaxed scrape fallback results:", allResults.length);
       }
     }
 
@@ -896,28 +979,38 @@ serve(async (req) => {
       );
     }
 
+    // Only real providers with an official booking URL
+    allResults = allResults.filter((r) => Boolean(r.url?.trim()));
+
     // Return only the single closest match card once details are complete.
     if (shouldSearch && allResults.length > 0) {
       allResults = [allResults[0]];
     }
 
-    // Build system prompt — sound like a warm human concierge, not a brochure
-    let systemPrompt = `You are Johanna, a friendly travel concierge on chat. Write like a real person: short, natural, warm. No bullet lists, no corporate fluff, no em dashes. Usually 1–2 short sentences. Never say you are an AI.
+    // Build system prompt — Johanna is a concierge matcher and redirection service
+    let systemPrompt = `You are Johanna, a warm travel concierge who qualifies travelers and matches them with real retreat and holiday providers. You find listings by searching official vendor sites (e.g. BookRetreats, BookYogaRetreats, Viator, TripAdvisor) — never invent retreats, never show "top 10" lists, and never push paid generic recommendations. Write like a real person: short, natural, warm. No bullet lists, no corporate fluff, no em dashes. Usually 1–2 short sentences. Never say you are an AI.
+
+Business model (always follow):
+- Qualify the traveler first (trip type, destination, dates, budget).
+- Match them with ONE real provider listing from scraped vendor pages.
+- The traveler pays a 5% concierge/redirection fee to unlock the official vendor booking link (fee paid by traveler, not the vendor).
+- Final booking always happens directly with the vendor on their official page.
+- Never promise vendor-side fees or commissions in this model.
 
 `;
 
     if (intent === "greeting") {
-      systemPrompt += `They just said hi (or similar). Greet back in a human way — you already introduced yourself in the app, so don’t re-introduce. Ask one thing: retreat or holiday, or where they’re dreaming of. One short paragraph max.`;
+      systemPrompt += `They just said hi (or similar). Greet back in a human way — you already introduced yourself in the app, so don’t re-introduce. Ask one qualifying question: retreat or holiday, or where they’re dreaming of. One short paragraph max.`;
     } else if (intent === "general") {
-      systemPrompt += `Quick, helpful reply. If it’s not about travel, answer briefly and gently steer back to planning a trip.`;
+      systemPrompt += `Quick, helpful reply. If it’s not about travel, answer briefly and gently steer back to qualifying their trip so you can match them with a real provider.`;
     } else if (intent === "question") {
-      systemPrompt += `Answer simply. Then one line offering to help them pick a retreat or holiday if they want.`;
+      systemPrompt += `Answer simply. Mention you match travelers with verified providers and redirect them to book directly with the vendor after a small 5% concierge fee. Then offer to help qualify their trip.`;
     } else if (!shouldSearch) {
-      systemPrompt += `You’re still learning what they want. Ask ONLY this, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message.`;
+      systemPrompt += `You’re still qualifying what they want. Ask ONLY this, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message.`;
     } else if (allResults.length > 0) {
-      systemPrompt += `You found the closest single match shown as a card below. Keep it brief and human: say this is the best match for their requirements and ask if they want alternatives too. Don’t list title or price in text (card already shows it). Max 2 sentences.`;
+      systemPrompt += `You found ONE real provider match from official vendor listings. Do NOT list multiple options. Briefly explain why it fits, mention the 5% concierge fee unlocks the official vendor booking link, and that they book directly with the provider. Keep it to 1–2 short sentences — details appear in the card.`;
     } else {
-      systemPrompt += `No good matches this round. Say so kindly in one or two short sentences, and ask one thing to try again (different place, dates, or budget).`;
+      systemPrompt += `No real provider matches this round. Say so kindly in one or two short sentences. Do not invent alternatives. Ask one thing to try again (different place, dates, or budget).`;
     }
 
     const chatMessages: ChatMessageOpenAI[] = [
@@ -926,16 +1019,23 @@ serve(async (req) => {
     ];
 
     let content: string;
-    try {
-      const out = await completeChatOpenRouter(OPENROUTER_API_KEY, chatMessages);
-      content = out.content;
-    } catch (aiErr) {
-      const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
-      if (msg.includes("rate limit")) {
-        console.warn("OpenRouter rate-limited, using local fallback message.");
-        content = buildRateLimitFallbackMessage(intent, shouldSearch, nextQuestion, allResults.length);
-      } else {
-        throw aiErr;
+
+    // When we have a match, keep the message short and show details in the card.
+    if (shouldSearch && allResults.length > 0) {
+      content =
+        "I matched you with a real provider below. Pay the 5% concierge fee to unlock their official booking link — you’ll complete your booking directly with them.";
+    } else {
+      try {
+        const out = await completeChatOpenAI(OPENAI_API_KEY, chatMessages);
+        content = out.content;
+      } catch (aiErr) {
+        const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
+        if (msg.toLowerCase().includes("rate limit")) {
+          console.warn("Model rate-limited, using local fallback message.");
+          content = buildRateLimitFallbackMessage(intent, shouldSearch, nextQuestion, allResults.length);
+        } else {
+          throw aiErr;
+        }
       }
     }
 

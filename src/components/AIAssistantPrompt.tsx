@@ -15,7 +15,7 @@ const AIAssistantPrompt = ({ onClick }: AIAssistantPromptProps) => {
       </div>
       <div className="text-left">
         <p className="font-medium text-foreground text-sm">Want to go?</p>
-        <p className="text-muted-foreground text-xs">Talk with our AI assistant</p>
+        <p className="text-muted-foreground text-xs">Talk with Johanna, your concierge</p>
       </div>
     </button>
   );

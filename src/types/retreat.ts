@@ -13,6 +13,8 @@ export interface Retreat {
   category: string;
   rating?: number;
   featured?: boolean;
+  /** External listing URL (e.g. BookRetreats) after payment unlock */
+  sourceUrl?: string;
 }
 
 export interface ChatMessage {

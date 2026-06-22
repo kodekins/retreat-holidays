@@ -6,11 +6,11 @@ interface ChatToggleButtonProps {
 }
 
 const messages = [
-  "Not sure what you want? I'll help you find it",
-  "Tell me your vibe, I'll find the perfect retreat",
-  "Let's build your dream holiday together",
-  "I've got the best retreats based on your taste",
-  "Answer a few questions & I'll do the rest"
+  "Not sure what you want? I'll qualify your trip and match you with a real provider",
+  "Tell me your vibe — I'll find a verified retreat or holiday",
+  "I match you with real providers, then redirect you to book directly",
+  "Answer a few questions and I'll find your provider match",
+  "One verified match — no generic lists, no invented retreats",
 ];
 
 const ChatToggleButton = ({ isOpen, onClick }: ChatToggleButtonProps) => {

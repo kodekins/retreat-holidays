@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.search-retreats]
 verify_jwt = false
+
+[functions.stripe-create-checkout]
+verify_jwt = false
+
+[functions.stripe-verify-retreat-payment]
+verify_jwt = false

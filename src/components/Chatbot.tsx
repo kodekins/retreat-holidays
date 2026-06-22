@@ -12,6 +12,7 @@ interface ChatbotProps {
   onClose: () => void;
   initialQuery?: string;
   onBookRetreat: (retreat: Retreat) => void;
+  unlockedRetreatIds?: string[];
 }
 
 interface AIMessage {
@@ -32,12 +33,13 @@ interface APIRetreat {
   source: string;
   url?: string;
   image?: string;
+  dates?: string | null;
 }
 
-const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps) => {
+const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat, unlockedRetreatIds = [] }: ChatbotProps) => {
   const { toast } = useToast();
   const initialGreeting =
-    "Your Retreat and Holiday Assistant. How are you doing today?";
+    "Hi, I'm Johanna — your concierge. Tell me what you're looking for and I'll match you with a verified retreat or holiday provider. You pay a small 5% fee to get their official booking link, then book directly with them.";
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -96,7 +98,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     name: apiRetreat.name,
     location: apiRetreat.location,
     country: apiRetreat.country,
-    dates: 'Flexible Dates',
+    dates: apiRetreat.dates?.trim() || 'Flexible Dates',
     duration: apiRetreat.duration,
     price: apiRetreat.price,
     currency: apiRetreat.currency || 'USD',
@@ -104,7 +106,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
     description: apiRetreat.description,
     activities: apiRetreat.activities,
     category: apiRetreat.activities[0]?.toLowerCase() || 'wellness',
-    rating: 4.8,
+    sourceUrl: apiRetreat.url,
   });
 
   const handleSendMessage = async (messageText?: string) => {
@@ -153,7 +155,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
         throw new Error((data as { error: string }).error);
       }
 
-      const aiContent = data?.content || "Here are some great retreat options for you!";
+      const aiContent = data?.content || "Tell me a bit more about your trip and I'll find a verified provider match for you.";
       
       // Convert API retreats to app format
       const retreats: Retreat[] = (data?.retreats || []).map(convertToRetreat);
@@ -225,7 +227,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
       {/* Header */}
       <div className="flex items-center justify-between p-5 border-b border-border bg-secondary/30">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
+          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-primary/20 shrink-0">
             <img
               src="travel-assistant.jpeg"
               alt="Johanna"
@@ -234,7 +236,7 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
           </div>
           <div>
             <h3 className="font-semibold text-foreground text-lg">Johanna</h3>
-            <p className="text-sm text-muted-foreground">CONCIERGE Specialist</p>
+            <p className="text-sm text-muted-foreground">Concierge &amp; Provider Matching</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -272,10 +274,11 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat }: ChatbotProps)
                 </div>
                 {message.retreats && message.retreats.length > 0 && (
                   <div className="space-y-3 mt-2">
-                    {message.retreats.slice(0, 10).map((retreat) => (
+                    {message.retreats.map((retreat) => (
                       <RetreatCard
                         key={retreat.id}
                         retreat={retreat}
+                        unlocked={unlockedRetreatIds.includes(retreat.id)}
                         onBook={onBookRetreat}
                         onWhatsApp={handleWhatsApp}
                       />
