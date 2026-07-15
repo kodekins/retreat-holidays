@@ -72,7 +72,7 @@ async function searchCuratedRetreats(preferences: any): Promise<TravelResult[]> 
       .neq("booking_url", "")
       .order("featured", { ascending: false });
 
-    if (preferences?.budget) {
+    if (preferences?.budget && Number.isFinite(Number(preferences.budget))) {
       query = query.lte("price", parseInt(preferences.budget));
     }
     if (preferences?.location) {
@@ -556,29 +556,55 @@ function parseTravelDate(text: string): string | undefined {
   return undefined;
 }
 
-/** Required details before searching: trip type + place + date (budget improves ranking). */
+/** Required before searching: trip type, place, dates, budget, and trip-specific vibe/details. */
 function isPreferencesComplete(preferences: any): boolean {
-  return Boolean(
-    preferences.tripType &&
-    preferences.location &&
-    preferences.date,
-  );
+  return getQualificationStage(preferences) === "complete";
+}
+
+function hasTripSpecificDetails(preferences: any): boolean {
+  if (preferences.tripType === "retreat") {
+    return Boolean(preferences.activities || preferences.duration || preferences.accommodation);
+  }
+  if (preferences.tripType === "holiday") {
+    return Boolean(preferences.activities || preferences.groupType);
+  }
+  return Boolean(preferences.activities || preferences.duration);
+}
+
+function getQualificationStage(
+  preferences: any,
+): "tripType" | "location" | "date" | "budget" | "tripDetails" | "complete" {
+  if (!preferences.tripType) return "tripType";
+  if (!preferences.location) return "location";
+  if (!preferences.date) return "date";
+  if (!preferences.budget) return "budget";
+  if (!hasTripSpecificDetails(preferences)) return "tripDetails";
+  return "complete";
 }
 
 function getNextPreferenceQuestion(preferences: any): string {
-  if (!preferences.tripType) {
-    return "Are you leaning more toward a retreat (wellness, yoga, that kind of thing) or a classic holiday?";
+  const stage = getQualificationStage(preferences);
+
+  switch (stage) {
+    case "tripType":
+      return "Are you leaning more toward a retreat (wellness, yoga, spa) or a classic holiday getaway?";
+    case "location":
+      return "Lovely — where in the world should I look? A city, country, or region works great.";
+    case "date":
+      return "When are you thinking of going? A month, date range, or even 'next summer' is perfect.";
+    case "budget":
+      return "What's your rough budget per person? A number or range helps me find the right fit — or say 'flexible' if you're open.";
+    case "tripDetails":
+      if (preferences.tripType === "retreat") {
+        return "What kind of retreat are you after — yoga, meditation, detox, spa? And roughly how many days?";
+      }
+      if (preferences.tripType === "holiday") {
+        return "What's the vibe — beach, adventure, city break, romantic? And is it solo, couple, or family?";
+      }
+      return "Any must-have activities or vibe (yoga, spa, beach, adventure), and how many days?";
+    default:
+      return "Anything else I should know to find your perfect match?";
   }
-  if (!preferences.location) {
-    return "Nice — where in the world should I look? City, country, or region is perfect.";
-  }
-  if (!preferences.date) {
-    return "Great. What dates or month are you planning for this trip?";
-  }
-  if (!preferences.budget) {
-    return "Great choice. Do you have a rough budget per person so I can narrow this down better?";
-  }
-  return "Any must-have activities or vibe (for example yoga, spa, beach, adventure), and how many days?";
 }
 
 // Extract preferences from conversation
@@ -588,10 +614,17 @@ function extractPreferences(messages: any[]): any {
   
   // Budget
   const budgetMatch = allText.match(/\b(?:budget[:\s]*|under\s+|\$)\s*\$?(\d{2,6}(?:,\d{3})?)\b/i)
-    || allText.match(/(\d{3,6})\s*(?:usd|dollars)\b/i)
-    || allText.match(/(\d{3,6})\s*-\s*\d{3,6}/);
+    || allText.match(/(\d{3,6})\s*(?:usd|dollars|eur|gbp)\b/i)
+    || allText.match(/(\d{3,6})\s*-\s*\d{3,6}/)
+    || allText.match(/\b(?:around|about|roughly|up to|max)\s+\$?(\d{2,6}(?:,\d{3})?)\b/i);
   if (budgetMatch) {
     preferences.budget = budgetMatch[1].replace(/,/g, "");
+  } else if (/\b(flexible|no budget|any budget|open.?ended|don'?t mind|not sure)\b/i.test(allText)) {
+    preferences.budget = "flexible";
+  } else if (/\b(luxury|premium|high.?end|5.?star)\b/i.test(allText)) {
+    preferences.budget = "5000";
+  } else if (/\b(cheap|affordable|backpack|low.?cost|on a budget)\b/i.test(allText)) {
+    preferences.budget = "1000";
   }
 
   // Preferred trip dates
@@ -690,7 +723,7 @@ function scoreMatch(result: TravelResult, preferences: any): number {
   }
   if (preferences?.tripType === "retreat" && result.type === "retreat") score += 1;
   if (preferences?.tripType === "holiday" && result.type === "holiday") score += 1;
-  if (preferences?.budget && Number.isFinite(result.price)) {
+  if (preferences?.budget && Number.isFinite(Number(preferences.budget)) && Number.isFinite(result.price)) {
     const budget = Number(preferences.budget);
     const delta = Math.abs(budget - result.price);
     if (result.price <= budget) {
@@ -991,7 +1024,7 @@ serve(async (req) => {
     let systemPrompt = `You are Johanna, a warm travel concierge who qualifies travelers and matches them with real retreat and holiday providers. You find listings by searching official vendor sites (e.g. BookRetreats, BookYogaRetreats, Viator, TripAdvisor) — never invent retreats, never show "top 10" lists, and never push paid generic recommendations. Write like a real person: short, natural, warm. No bullet lists, no corporate fluff, no em dashes. Usually 1–2 short sentences. Never say you are an AI.
 
 Business model (always follow):
-- Qualify the traveler first (trip type, destination, dates, budget).
+- Qualify the traveler first (trip type, destination, dates, budget, and vibe/activities). Ask one question at a time until you have enough detail — never jump to listings early.
 - Match them with ONE real provider listing from scraped vendor pages.
 - The traveler pays a 5% concierge/redirection fee to unlock the official vendor booking link (fee paid by traveler, not the vendor).
 - Final booking always happens directly with the vendor on their official page.
@@ -1000,13 +1033,17 @@ Business model (always follow):
 `;
 
     if (intent === "greeting") {
-      systemPrompt += `They just said hi (or similar). Greet back in a human way — you already introduced yourself in the app, so don’t re-introduce. Ask one qualifying question: retreat or holiday, or where they’re dreaming of. One short paragraph max.`;
+      if (!hasCompletePreferences && nextQuestion) {
+        systemPrompt += `They just said hi (or similar). Greet back warmly — you already introduced yourself in the app, so don’t re-introduce. Ask ONLY this next qualifying question in your own casual words: ${nextQuestion} Keep it to one short message.`;
+      } else {
+        systemPrompt += `They just said hi (or similar). Greet back in a human way — you already introduced yourself in the app, so don’t re-introduce. Ask what kind of trip they’re dreaming of (retreat or holiday), where, when, and rough budget — one question at a time. One short paragraph max.`;
+      }
     } else if (intent === "general") {
       systemPrompt += `Quick, helpful reply. If it’s not about travel, answer briefly and gently steer back to qualifying their trip so you can match them with a real provider.`;
     } else if (intent === "question") {
       systemPrompt += `Answer simply. Mention you match travelers with verified providers and redirect them to book directly with the vendor after a small 5% concierge fee. Then offer to help qualify their trip.`;
     } else if (!shouldSearch) {
-      systemPrompt += `You’re still qualifying what they want. Ask ONLY this, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message.`;
+      systemPrompt += `You’re still qualifying what they want — don’t search or suggest listings yet. Ask ONLY this next question, in your own casual words (don’t quote it verbatim if it sounds stiff): ${nextQuestion} Keep it to one short message. Acknowledge what they’ve already shared if relevant.`;
     } else if (allResults.length > 0) {
       systemPrompt += `You found ONE real provider match from official vendor listings. Do NOT list multiple options. Briefly explain why it fits, mention the 5% concierge fee unlocks the official vendor booking link, and that they book directly with the provider. Keep it to 1–2 short sentences — details appear in the card.`;
     } else {
@@ -1020,26 +1057,13 @@ Business model (always follow):
 
     let content: string;
 
-    // When we have a match, keep the message short and show details in the card.
-    if (shouldSearch && allResults.length > 0) {
-      content =
-        "I matched you with a real provider below. Pay the 5% concierge fee to unlock their official booking link — you’ll complete your booking directly with them.";
-    } else {
-      try {
-        const out = await completeChatOpenAI(OPENAI_API_KEY, chatMessages);
-        content = out.content;
-      } catch (aiErr) {
-        const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
-        if (msg.toLowerCase().includes("rate limit")) {
-          console.warn("Model rate-limited, using local fallback message.");
-          content = buildRateLimitFallbackMessage(intent, shouldSearch, nextQuestion, allResults.length);
-        } else {
-          throw aiErr;
-        }
-      }
-    }
-
     console.log("Response:", content.substring(0, 50), "Results:", allResults.length);
+
+    // Always use short intro text when a match card is attached — details stay in the blurred card.
+    if (allResults.length > 0) {
+      content =
+        "I matched you with a real provider below. Pay the 5% concierge fee to unlock their official booking link — you'll complete your booking directly with them.";
+    }
 
     return new Response(JSON.stringify({
       content,

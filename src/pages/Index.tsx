@@ -10,18 +10,7 @@ import { Retreat } from '@/types/retreat';
 import { Droplet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-const UNLOCK_STORAGE_KEY = 'retreat_unlocked_ids';
-
-const readUnlockedIds = (): string[] => {
-  try {
-    const raw = sessionStorage.getItem(UNLOCK_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-};
+import { appendUnlockedRetreatKey, readUnlockedRetreatKeys } from '@/utils/retreatUnlock';
 
 const Index = () => {
   const { toast } = useToast();
@@ -29,7 +18,7 @@ const Index = () => {
   const [initialQuery, setInitialQuery] = useState<string | undefined>();
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedRetreat, setSelectedRetreat] = useState<Retreat | null>(null);
-  const [unlockedRetreatIds, setUnlockedRetreatIds] = useState<string[]>(() => readUnlockedIds());
+  const [unlockedRetreatIds, setUnlockedRetreatIds] = useState<string[]>(() => readUnlockedRetreatKeys());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -60,10 +49,11 @@ const Index = () => {
         }
 
         setUnlockedRetreatIds((prev) => {
-          const next = [...new Set([...prev, payload.retreatId!])];
-          sessionStorage.setItem(UNLOCK_STORAGE_KEY, JSON.stringify(next));
+          const next = appendUnlockedRetreatKey({ id: payload.retreatId }, prev);
           return next;
         });
+
+        setIsChatOpen(true);
 
         toast({
           title: 'Payment successful',

@@ -65,6 +65,26 @@ function encodeRetreatMetadata(r: CompactRetreat): Record<string, string> {
   return meta;
 }
 
+function resolveSiteUrl(req: Request, body: Record<string, unknown>): string | null {
+  const fromBody = String((body.siteUrl as string | undefined) || "").trim();
+  if (fromBody) return fromBody.replace(/\/$/, "");
+
+  const origin = req.headers.get("origin")?.trim();
+  if (origin) return origin.replace(/\/$/, "");
+
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwardedProto && forwardedHost) return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
+
+  const host = req.headers.get("host")?.trim();
+  if (host) {
+    const proto = forwardedProto || "https";
+    return `${proto}://${host}`.replace(/\/$/, "");
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -72,20 +92,21 @@ serve(async (req) => {
 
   try {
     const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")?.trim();
-    const SITE_URL = Deno.env.get("SITE_URL")?.trim()?.replace(/\/$/, "");
 
     if (!STRIPE_SECRET_KEY) {
       throw new Error("STRIPE_SECRET_KEY is not set in Edge Function secrets.");
-    }
-    if (!SITE_URL) {
-      throw new Error(
-        "SITE_URL is not set (e.g. https://yourdomain.com). Add it in Supabase Edge Function secrets.",
-      );
     }
 
     const body = await req.json();
     const customerEmail = String(body.customerEmail || "").trim();
     const customerName = String(body.customerName || "").trim();
+    const SITE_URL = resolveSiteUrl(req, body as Record<string, unknown>) || Deno.env.get("SITE_URL")?.trim()?.replace(/\/$/, "");
+
+    if (!SITE_URL) {
+      throw new Error(
+        "SITE_URL could not be determined. Pass siteUrl in the request body or set the SITE_URL edge function secret.",
+      );
+    }
 
     if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
       throw new Error("Valid customer email is required.");

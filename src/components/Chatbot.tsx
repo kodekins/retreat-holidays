@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { supabase } from '@/integrations/supabase/client';
+import { isRetreatUnlocked } from '@/utils/retreatUnlock';
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -36,10 +37,22 @@ interface APIRetreat {
   dates?: string | null;
 }
 
+const MATCH_CARD_INTRO =
+  "I matched you with a real provider below. Pay the 5% concierge fee to unlock their official booking link — you'll complete your booking directly with them.";
+
+/** Keep match details in the card, not as a long text dump in the chat bubble. */
+function sanitizeMatchContent(content: string, hasRetreats: boolean): string {
+  if (!hasRetreats) return content;
+  if (/Perfect Match|Booking Link:|🏝|🔗|📍\s*Location:|💰\s*Price:/i.test(content)) {
+    return MATCH_CARD_INTRO;
+  }
+  return content;
+}
+
 const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat, unlockedRetreatIds = [] }: ChatbotProps) => {
   const { toast } = useToast();
   const initialGreeting =
-    "Hi, I'm Johanna — your concierge. Tell me what you're looking for and I'll match you with a verified retreat or holiday provider. You pay a small 5% fee to get their official booking link, then book directly with them.";
+    "Hi, I'm Johanna — your concierge. Are you dreaming of a wellness retreat or a holiday getaway? Tell me where, when, your rough budget, and what vibe you're after — I'll match you with a verified provider. You pay a small 5% fee to unlock their official booking link, then book directly with them.";
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -155,10 +168,11 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat, unlockedRetreat
         throw new Error((data as { error: string }).error);
       }
 
-      const aiContent = data?.content || "Tell me a bit more about your trip and I'll find a verified provider match for you.";
-      
+      const rawContent = data?.content || "Tell me a bit more about your trip and I'll find a verified provider match for you.";
+
       // Convert API retreats to app format
       const retreats: Retreat[] = (data?.retreats || []).map(convertToRetreat);
+      const aiContent = sanitizeMatchContent(rawContent, retreats.length > 0);
 
       const assistantMessage: ChatMessage = {
         id: uuidv4(),
@@ -273,16 +287,23 @@ const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat, unlockedRetreat
                   {message.content}
                 </div>
                 {message.retreats && message.retreats.length > 0 && (
-                  <div className="space-y-3 mt-2">
-                    {message.retreats.map((retreat) => (
-                      <RetreatCard
-                        key={retreat.id}
-                        retreat={retreat}
-                        unlocked={unlockedRetreatIds.includes(retreat.id)}
-                        onBook={onBookRetreat}
-                        onWhatsApp={handleWhatsApp}
-                      />
-                    ))}
+                  <div className="space-y-3 mt-2 w-full">
+                    {message.retreats.map((retreat) => {
+                      const isUnlocked = isRetreatUnlocked(retreat, unlockedRetreatIds);
+                      const displayRetreat = isUnlocked
+                        ? retreat
+                        : { ...retreat, sourceUrl: undefined };
+
+                      return (
+                        <RetreatCard
+                          key={retreat.id}
+                          retreat={displayRetreat}
+                          unlocked={isUnlocked}
+                          onBook={() => onBookRetreat(retreat)}
+                          onWhatsApp={handleWhatsApp}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>

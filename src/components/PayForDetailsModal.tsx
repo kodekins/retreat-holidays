@@ -25,6 +25,7 @@ const PayForDetailsModal = ({ isOpen, onClose, retreat }: PayForDetailsModalProp
     try {
       const { data, error } = await supabase.functions.invoke('stripe-create-checkout', {
         body: {
+          siteUrl: window.location.origin,
           customerEmail: email.trim(),
           customerName: fullName.trim(),
           retreat: {

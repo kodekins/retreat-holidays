@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { Retreat } from '@/types/retreat';
-import { ExternalLink, MessageCircle } from 'lucide-react';
+import { ExternalLink, Lock, MessageCircle } from 'lucide-react';
 import { calculateFinalPrice, formatPrice, getConciergeFee } from '@/utils/pricing';
 
 interface RetreatCardProps {
@@ -16,19 +16,33 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(
     const conciergeFee = getConciergeFee(retreat.price);
 
     return (
-      <div ref={ref} className="bg-card rounded-lg overflow-hidden shadow-md border border-border animate-slide-up">
+      <div
+        ref={ref}
+        className={`bg-card rounded-lg overflow-hidden shadow-md border animate-slide-up ${
+          unlocked ? 'border-border' : 'border-primary/20'
+        }`}
+      >
         <div className="relative">
           <img
             src={retreat.image}
-            alt={retreat.name}
+            alt={unlocked ? retreat.name : 'Retreat preview'}
             className={
               unlocked
                 ? 'w-full h-36 object-cover'
-                : 'w-full h-36 object-cover blur-md scale-[1.04] brightness-75'
+                : 'w-full h-36 object-cover blur-lg scale-[1.06] brightness-[0.55]'
             }
           />
-          {!unlocked && <div className="absolute inset-0 bg-background/30 backdrop-blur-md" />}
-          <div className="absolute bottom-2 right-2">
+          {!unlocked && (
+            <div className="absolute inset-0 bg-background/45 backdrop-blur-md flex flex-col items-center justify-center gap-1.5">
+              <div className="bg-background/80 rounded-full p-2 shadow-sm">
+                <Lock className="w-4 h-4 text-primary" />
+              </div>
+              <p className="text-[11px] font-medium text-foreground/90 px-3 text-center">
+                Preview locked — pay fee to unlock
+              </p>
+            </div>
+          )}
+          <div className="absolute bottom-2 right-2 z-[1]">
             <span className="bg-background/90 backdrop-blur-sm text-xs px-2 py-1 rounded-full text-foreground font-medium">
               {retreat.duration}
             </span>
@@ -36,51 +50,48 @@ const RetreatCard = forwardRef<HTMLDivElement, RetreatCardProps>(
         </div>
 
         <div className="p-3">
-          <h4
-            className={
-              unlocked
-                ? 'font-semibold text-sm text-foreground mb-1 line-clamp-2 font-display'
-                : 'font-semibold text-sm text-foreground mb-1 line-clamp-2 font-display blur-sm select-none'
-            }
-          >
-            {retreat.name}
-          </h4>
+          <div className="relative">
+            <div
+              className={
+                unlocked ? '' : 'blur-[6px] select-none pointer-events-none opacity-80'
+              }
+            >
+              <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2 font-display">
+                {retreat.name}
+              </h4>
 
-          <ul
-            className={
-              unlocked
-                ? 'text-xs text-muted-foreground space-y-0.5 mb-2'
-                : 'text-xs text-muted-foreground space-y-0.5 mb-2 blur-sm select-none'
-            }
-          >
-            <li>
-              <span className="font-medium text-foreground">Location:</span> {retreat.location},{' '}
-              {retreat.country}
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Dates:</span> {retreat.dates}
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Vendor price:</span>{' '}
-              {formatPrice(listingPrice, retreat.currency)}
-            </li>
+              <ul className="text-xs text-muted-foreground space-y-0.5 mb-2">
+                <li>
+                  <span className="font-medium text-foreground">Location:</span> {retreat.location},{' '}
+                  {retreat.country}
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Dates:</span> {retreat.dates}
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Vendor price:</span>{' '}
+                  {formatPrice(listingPrice, retreat.currency)}
+                </li>
+                {!unlocked && (
+                  <li>
+                    <span className="font-medium text-foreground">Concierge fee (5%):</span>{' '}
+                    {formatPrice(conciergeFee, retreat.currency)}
+                  </li>
+                )}
+              </ul>
+
+              <p className="text-xs text-muted-foreground line-clamp-3 mb-3">
+                <span className="font-medium text-foreground">Details:</span> {retreat.description}
+              </p>
+            </div>
+
             {!unlocked && (
-              <li>
-                <span className="font-medium text-foreground">Concierge fee (5%):</span>{' '}
-                {formatPrice(conciergeFee, retreat.currency)}
-              </li>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/35 backdrop-blur-[1px] rounded-md">
+                <Lock className="w-3.5 h-3.5 text-muted-foreground mb-1" />
+                <p className="text-[10px] text-muted-foreground font-medium">Provider details hidden</p>
+              </div>
             )}
-          </ul>
-
-          <p
-            className={
-              unlocked
-                ? 'text-xs text-muted-foreground line-clamp-4 mb-3'
-                : 'text-xs text-muted-foreground line-clamp-3 mb-3 blur-sm select-none'
-            }
-          >
-            <span className="font-medium text-foreground">Details:</span> {retreat.description}
-          </p>
+          </div>
 
           {unlocked && retreat.sourceUrl && (
             <a
