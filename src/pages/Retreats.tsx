@@ -4,7 +4,8 @@ import { Retreat } from '@/types/retreat';
 import Header from '@/components/Header';
 import DetailedFooter from '@/components/DetailedFooter';
 import BookingModal from '@/components/BookingModal';
-import { MessageCircle, MapPin, Calendar, DollarSign, Star, Loader2, Filter, X } from 'lucide-react';
+import RetreatDetailsModal from '@/components/RetreatDetailsModal';
+import { MessageCircle, MapPin, Calendar, DollarSign, Star, Loader2, Filter, X, Eye } from 'lucide-react';
 import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,11 +29,43 @@ interface CuratedRetreat {
   whatsapp_number: string | null;
 }
 
+function normalizeString(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+  return fallback;
+}
+
+function normalizeActivities(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizePrice(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 const Retreats = () => {
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRetreat, setSelectedRetreat] = useState<Retreat | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   
   // Filters
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -46,7 +79,8 @@ const Retreats = () => {
   }, []);
 
   const isRetreatLive = (dates: string | null): boolean => {
-    if (!dates || dates === 'Flexible Dates') return true;
+    const normalizedDates = typeof dates === 'string' ? dates : '';
+    if (!normalizedDates || normalizedDates === 'Flexible Dates') return true;
     
     // Try to parse dates - look for end date patterns
     const today = new Date();
@@ -60,7 +94,7 @@ const Retreats = () => {
     ];
     
     // Extract all year mentions
-    const yearMatch = dates.match(/20\d{2}/g);
+    const yearMatch = normalizedDates.match(/20\d{2}/g);
     if (yearMatch) {
       const years = yearMatch.map(y => parseInt(y));
       const maxYear = Math.max(...years);
@@ -72,7 +106,7 @@ const Retreats = () => {
       // If it's current or future year, check months if possible
       if (maxYear === currentYear) {
         const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-        const lowerDates = dates.toLowerCase();
+        const lowerDates = normalizedDates.toLowerCase();
         
         // Find the last mentioned month
         let lastMonthIndex = -1;
@@ -103,19 +137,31 @@ const Retreats = () => {
       if (error) throw error;
 
       const formattedRetreats: Retreat[] = (data || []).map((r: CuratedRetreat) => ({
-        id: r.id,
-        name: r.name,
-        location: r.location,
-        country: r.country,
-        dates: r.dates || 'Flexible Dates',
-        duration: r.duration,
-        price: r.price,
-        currency: r.currency || 'USD',
-        image: r.image_url || 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80',
-        description: r.description,
-        activities: r.activities || [],
-        category: r.category,
-        rating: r.rating || 4.8,
+        id: String(r.id || ''),
+        name: normalizeString(r.name, 'Untitled retreat'),
+        location: normalizeString(r.location, 'TBD'),
+        country: normalizeString(r.country, 'Worldwide'),
+        dates: normalizeString(r.dates, 'Flexible Dates'),
+        duration: normalizeString(r.duration, 'Flexible'),
+        price: normalizePrice(r.price),
+        currency: normalizeString(r.currency, 'USD').toUpperCase() || 'USD',
+        image: normalizeString(r.image_url, 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80'),
+        description: normalizeString(r.description, 'More details coming soon.'),
+        activities: normalizeActivities(r.activities),
+        category: normalizeString(r.category, 'wellness'),
+        rating: Number.isFinite(Number(r.rating)) ? Number(r.rating) : 4.8,
+        pricingVariations: Array.isArray((r as { pricing_variations?: unknown }).pricing_variations)
+          ? ((r as { pricing_variations?: unknown }).pricing_variations as Array<Record<string, unknown>>).map((option, index) => ({
+              id: String(option.id || `variation-${index}`),
+              name: normalizeString(option.name, 'Package option'),
+              description: normalizeString(option.description, ''),
+              price: normalizePrice(option.price),
+              currency: normalizeString(option.currency, r.currency || 'USD').toUpperCase() || 'USD',
+              includes: Array.isArray(option.includes)
+                ? option.includes.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+                : [],
+            }))
+          : [],
       }));
 
       // Filter only live retreats (dates not in the past)
@@ -128,8 +174,14 @@ const Retreats = () => {
     }
   };
 
+  const handleViewDetails = (retreat: Retreat) => {
+    setSelectedRetreat(retreat);
+    setIsDetailsModalOpen(true);
+  };
+
   const handleBookRetreat = (retreat: Retreat) => {
     setSelectedRetreat(retreat);
+    setIsDetailsModalOpen(false);
     setIsBookingModalOpen(true);
   };
 
@@ -410,6 +462,13 @@ const Retreats = () => {
                     {/* Actions */}
                     <div className="flex gap-2">
                       <button
+                        onClick={() => handleViewDetails(retreat)}
+                        className="flex items-center justify-center gap-2 border border-border bg-secondary/70 py-2.5 px-3 rounded-lg font-medium text-foreground hover:bg-secondary transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Details
+                      </button>
+                      <button
                         onClick={() => handleBookRetreat(retreat)}
                         className="flex-1 bg-primary text-primary-foreground py-2.5 px-4 rounded-lg font-medium hover:bg-primary-dark transition-colors"
                       >
@@ -432,6 +491,13 @@ const Retreats = () => {
       </main>
 
       <DetailedFooter />
+
+      <RetreatDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        retreat={selectedRetreat}
+        onBook={handleBookRetreat}
+      />
 
       <BookingModal
         isOpen={isBookingModalOpen}

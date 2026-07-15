@@ -32,6 +32,7 @@ export type Database = {
           location: string
           name: string
           price: number
+          pricing_variations: Json | null
           rating: number | null
           updated_at: string
           whatsapp_number: string | null
@@ -53,6 +54,7 @@ export type Database = {
           location: string
           name: string
           price: number
+          pricing_variations?: Json | null
           rating?: number | null
           updated_at?: string
           whatsapp_number?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           location?: string
           name?: string
           price?: number
+          pricing_variations?: Json | null
           rating?: number | null
           updated_at?: string
           whatsapp_number?: string | null

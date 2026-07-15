@@ -7,7 +7,6 @@ const Header = () => {
 
   const navItems = [
     { to: '/', label: 'Home' },
-    { to: '/gcc', label: 'GCC Retreats' },
     { to: '/our-exclusive-retreats', label: 'Our Exclusive Retreats' },
     { to: '/blog', label: 'Blog' },
     { to: '/about-retreats-holidays', label: 'About Retreats Holidays' },

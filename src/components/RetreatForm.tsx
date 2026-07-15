@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { RetreatPricingOption } from '@/types/retreat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,6 +72,7 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
     featured: retreat?.featured || false,
     booking_url: retreat?.booking_url || '',
     whatsapp_number: retreat?.whatsapp_number || '',
+    pricingVariations: (retreat?.pricing_variations || retreat?.pricingVariations || []) as RetreatPricingOption[],
   });
 
   const handleChange = (field: string, value: any) => {
@@ -87,6 +89,23 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
     } else {
       handleChange('activities', [...current, activity]);
     }
+  };
+
+  const handleAddPricingVariation = () => {
+    handleChange('pricingVariations', [
+      ...formData.pricingVariations,
+      { id: `variation-${Date.now()}`, name: 'Flights included', description: 'Optional flights and transfers', price: 0, currency: formData.currency, includes: [] },
+    ]);
+  };
+
+  const handleUpdatePricingVariation = (index: number, updates: Partial<RetreatPricingOption>) => {
+    const next = [...formData.pricingVariations];
+    next[index] = { ...next[index], ...updates };
+    handleChange('pricingVariations', next);
+  };
+
+  const handleRemovePricingVariation = (index: number) => {
+    handleChange('pricingVariations', formData.pricingVariations.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,22 +189,24 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const parsedPrice = Number.parseFloat(formData.price);
       const retreatData = {
         name: formData.name,
         location: formData.location,
         country: formData.country,
         description: formData.description,
-        price: parseFloat(formData.price),
+        price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
         currency: formData.currency,
         duration: formData.duration,
         dates: formData.dates || null,
         image_url: formData.image_url || null,
-        activities: formData.activities,
+        activities: Array.isArray(formData.activities) ? formData.activities : [],
         category: formData.category,
-        rating: formData.rating ? parseFloat(formData.rating) : null,
+        rating: formData.rating ? Number.parseFloat(formData.rating) : null,
         featured: formData.featured,
         booking_url: formData.booking_url || null,
         whatsapp_number: formData.whatsapp_number || null,
+        pricing_variations: formData.pricingVariations,
         created_by: user.id,
       };
 
@@ -356,6 +377,77 @@ const RetreatForm = ({ retreat, onClose, onSuccess }: RetreatFormProps) => {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pricing Variations</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Add optional package variations such as flights, visa, or transfers.
+                </p>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddPricingVariation}>
+                  Add option
+                </Button>
+              </div>
+
+              {formData.pricingVariations.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  No pricing variations yet. Add one to offer package choices to travelers.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {formData.pricingVariations.map((variation, index) => (
+                    <div key={variation.id || index} className="rounded-lg border border-border p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-foreground">Option {index + 1}</p>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRemovePricingVariation(index)}>
+                          Remove
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Option name</Label>
+                          <Input
+                            value={variation.name}
+                            onChange={(e) => handleUpdatePricingVariation(index, { name: e.target.value })}
+                            placeholder="Flights included"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Option price</Label>
+                          <Input
+                            type="number"
+                            value={variation.price}
+                            onChange={(e) => handleUpdatePricingVariation(index, { price: Number(e.target.value) })}
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={variation.description || ''}
+                          onChange={(e) => handleUpdatePricingVariation(index, { description: e.target.value })}
+                          placeholder="Includes flights and airport transfers"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Includes (comma separated)</Label>
+                        <Input
+                          value={(variation.includes || []).join(', ')}
+                          onChange={(e) => handleUpdatePricingVariation(index, { includes: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) })}
+                          placeholder="Flights, Visa, Transfers"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

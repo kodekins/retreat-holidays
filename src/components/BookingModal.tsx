@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Retreat, BookingFormData } from '@/types/retreat';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateFinalPrice, formatPrice } from '@/utils/pricing';
+import { formatPrice, getEffectiveRetreatPrice } from '@/utils/pricing';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -14,6 +14,7 @@ interface BookingModalProps {
 const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null);
   const [formData, setFormData] = useState<BookingFormData>({
     firstName: '',
     lastName: '',
@@ -22,6 +23,20 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
     numberOfGuests: 1,
     specialRequests: '',
   });
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedVariationId(null);
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        numberOfGuests: 1,
+        specialRequests: '',
+      });
+    }
+  }, [isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -38,7 +53,7 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
     setIsSubmitting(true);
 
     try {
-      const finalPrice = calculateFinalPrice(retreat.price);
+      const pricing = getEffectiveRetreatPrice(retreat, selectedVariationId);
       
       const { error } = await supabase.functions.invoke('send-booking-email', {
         body: {
@@ -48,7 +63,7 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
           retreatName: retreat.name,
           retreatLocation: `${retreat.location}, ${retreat.country}`,
           retreatDuration: retreat.duration,
-          retreatPrice: finalPrice,
+          retreatPrice: pricing.price,
           numberOfGuests: formData.numberOfGuests,
           specialRequests: formData.specialRequests,
         }
@@ -84,8 +99,9 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
 
   if (!isOpen || !retreat) return null;
 
-  const finalPrice = calculateFinalPrice(retreat.price);
-  const totalPrice = finalPrice * formData.numberOfGuests;
+  const pricing = getEffectiveRetreatPrice(retreat, selectedVariationId);
+  const selectedVariation = retreat?.pricingVariations?.find((variation) => variation.id === selectedVariationId) || retreat?.pricingVariations?.[0] || null;
+  const totalPrice = pricing.price * formData.numberOfGuests;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -123,8 +139,11 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
               </p>
               <p className="text-xs text-muted-foreground">{retreat.duration} • {retreat.dates}</p>
               <p className="text-sm font-semibold text-primary mt-1">
-                {formatPrice(finalPrice, retreat.currency)} per person
+                {formatPrice(pricing.price, pricing.currency)} per person
               </p>
+              {selectedVariation && (
+                <p className="mt-1 text-xs text-muted-foreground">Selected option: {selectedVariation.name}</p>
+              )}
             </div>
           </div>
         </div>
@@ -188,6 +207,35 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
             />
           </div>
 
+          {retreat.pricingVariations && retreat.pricingVariations.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Package option
+              </label>
+              <div className="space-y-2">
+                {retreat.pricingVariations.map((variation) => {
+                  const isSelected = selectedVariationId === variation.id || (!selectedVariationId && variation.id === retreat.pricingVariations?.[0]?.id);
+                  return (
+                    <button
+                      key={variation.id}
+                      type="button"
+                      onClick={() => setSelectedVariationId(variation.id)}
+                      className={`w-full rounded-lg border p-3 text-left transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-secondary'}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground">{variation.name}</p>
+                          {variation.description && <p className="text-sm text-muted-foreground">{variation.description}</p>}
+                        </div>
+                        <p className="font-semibold text-primary">{formatPrice(variation.price, variation.currency || retreat.currency)}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               Number of Guests
@@ -223,11 +271,11 @@ const BookingModal = ({ isOpen, onClose, retreat }: BookingModalProps) => {
           {/* Price Summary */}
           <div className="bg-secondary/50 rounded-lg p-3">
             <div className="flex justify-between text-sm text-muted-foreground mb-1">
-              <span>{formatPrice(finalPrice, retreat.currency)} × {formData.numberOfGuests} guest{formData.numberOfGuests > 1 ? 's' : ''}</span>
+              <span>{formatPrice(pricing.price, pricing.currency)} × {formData.numberOfGuests} guest{formData.numberOfGuests > 1 ? 's' : ''}</span>
             </div>
             <div className="flex justify-between font-semibold text-foreground">
               <span>Total</span>
-              <span className="text-primary">{formatPrice(totalPrice, retreat.currency)}</span>
+              <span className="text-primary">{formatPrice(totalPrice, pricing.currency)}</span>
             </div>
           </div>
 

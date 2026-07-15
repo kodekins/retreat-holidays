@@ -1,3 +1,12 @@
+export interface RetreatPricingOption {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency?: string;
+  includes?: string[];
+}
+
 export interface Retreat {
   id: string;
   name: string;
@@ -15,6 +24,8 @@ export interface Retreat {
   featured?: boolean;
   /** External listing URL (e.g. BookRetreats) after payment unlock */
   sourceUrl?: string;
+  /** Optional package variations like flights, visa, or transfers */
+  pricingVariations?: RetreatPricingOption[];
 }
 
 export interface ChatMessage {
