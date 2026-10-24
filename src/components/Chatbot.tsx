@@ -1,368 +1,72 @@
-import { X, RefreshCw, Send, Loader2, Mic, MicOff } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import { ChatMessage, Retreat } from '@/types/retreat';
-import RetreatCard from './RetreatCard';
-import { v4 as uuidv4 } from 'uuid';
-import { useToast } from '@/hooks/use-toast';
-import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { supabase } from '@/integrations/supabase/client';
-import { isRetreatUnlocked } from '@/utils/retreatUnlock';
+import { RefreshCw, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface ChatbotProps {
   isOpen: boolean;
   onClose: () => void;
-  initialQuery?: string;
-  onBookRetreat: (retreat: Retreat) => void;
-  unlockedRetreatIds?: string[];
 }
 
-interface AIMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+const JOHANNA_EMBED_URL =
+  'https://johanna-retreats-holidays-gxdv8a.v2.appdeploy.ai/?embed=1&channel=retreats';
 
-interface APIRetreat {
-  id: string;
-  name: string;
-  location: string;
-  country: string;
-  duration: string;
-  price: number;
-  currency: string;
-  description: string;
-  activities: string[];
-  source: string;
-  url?: string;
-  image?: string;
-  dates?: string | null;
-}
-
-const MATCH_CARD_INTRO =
-  "I matched you with a real provider below. Pay the 5% concierge fee to unlock their official booking link — you'll complete your booking directly with them.";
-
-/** Keep match details in the card, not as a long text dump in the chat bubble. */
-function sanitizeMatchContent(content: string, hasRetreats: boolean): string {
-  if (!hasRetreats) return content;
-  if (/Perfect Match|Booking Link:|🏝|🔗|📍\s*Location:|💰\s*Price:/i.test(content)) {
-    return MATCH_CARD_INTRO;
-  }
-  return content;
-}
-
-const Chatbot = ({ isOpen, onClose, initialQuery, onBookRetreat, unlockedRetreatIds = [] }: ChatbotProps) => {
-  const { toast } = useToast();
-  const initialGreeting =
-    "Hi, I'm Johanna — your concierge. Are you dreaming of a wellness retreat or a holiday getaway? Tell me where, when, your rough budget, and what vibe you're after — I'll match you with a verified provider. You pay a small 5% fee to unlock their official booking link, then book directly with them.";
-
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: initialGreeting,
-      timestamp: new Date(),
-    },
-  ]);
-  const [conversationHistory, setConversationHistory] = useState<AIMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const { isListening, toggleListening } = useVoiceInput({
-    onTranscript: (text) => {
-      setInput(text);
-      // Auto-send after voice input
-      setTimeout(() => {
-        handleSendMessage(text);
-      }, 100);
-    },
-    onError: (error) => {
-      toast({
-        title: "Voice Input Error",
-        description: error,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    if (isOpen && initialQuery && messages.length === 1) {
-      handleSendMessage(initialQuery);
-    }
-  }, [isOpen, initialQuery]);
-
-  useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  // Convert API retreat to app Retreat format
-  const convertToRetreat = (apiRetreat: APIRetreat): Retreat => ({
-    id: apiRetreat.id,
-    name: apiRetreat.name,
-    location: apiRetreat.location,
-    country: apiRetreat.country,
-    dates: apiRetreat.dates?.trim() || 'Flexible Dates',
-    duration: apiRetreat.duration,
-    price: apiRetreat.price,
-    currency: apiRetreat.currency || 'USD',
-    image: apiRetreat.image || 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80',
-    description: apiRetreat.description,
-    activities: apiRetreat.activities,
-    category: apiRetreat.activities[0]?.toLowerCase() || 'wellness',
-    sourceUrl: apiRetreat.url,
-  });
-
-  const handleSendMessage = async (messageText?: string) => {
-    const text = messageText || input;
-    if (!text.trim()) return;
-
-    const userMessage: ChatMessage = {
-      id: uuidv4(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    const newConversationHistory: AIMessage[] = [
-      ...conversationHistory,
-      { role: 'user', content: text }
-    ];
-
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const jwtKey =
-        import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      if (!supabaseUrl || !jwtKey) {
-        throw new Error(
-          'Missing Supabase env. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (JWT from Dashboard → API → anon public). Publishable keys cannot be used as Bearer tokens for Edge Functions.',
-        );
-      }
-      if (!import.meta.env.VITE_SUPABASE_ANON_KEY && jwtKey.startsWith('sb_publishable_')) {
-        throw new Error(
-          'Add VITE_SUPABASE_ANON_KEY to .env (Supabase Dashboard → Project Settings → API → anon public). The publishable key is not a valid JWT for ai-chat.',
-        );
-      }
-
-      const { data, error: fnError } = await supabase.functions.invoke('ai-chat', {
-        body: { messages: newConversationHistory },
-      });
-
-      if (fnError) {
-        throw new Error(fnError.message || 'AI function request failed');
-      }
-      if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
-        throw new Error((data as { error: string }).error);
-      }
-
-      const rawContent = data?.content || "Tell me a bit more about your trip and I'll find a verified provider match for you.";
-
-      // Convert API retreats to app format
-      const retreats: Retreat[] = (data?.retreats || []).map(convertToRetreat);
-      const aiContent = sanitizeMatchContent(rawContent, retreats.length > 0);
-
-      const assistantMessage: ChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: aiContent,
-        retreats: retreats.length > 0 ? retreats : undefined,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setConversationHistory([
-        ...newConversationHistory,
-        { role: 'assistant', content: aiContent }
-      ]);
-    } catch (error) {
-      console.error('AI chat error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to get AI response. Please try again.",
-        variant: "destructive",
-      });
-
-      const fallbackMessage: ChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: "I'm having trouble connecting right now. Please try again in a moment.",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, fallbackMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWhatsApp = (retreat: Retreat) => {
-    const message = encodeURIComponent(
-      `Hi! I'm interested in the "${retreat.name}" retreat in ${retreat.location}, ${retreat.country}. Can you provide more information?`
-    );
-    window.open(`https://wa.me/23058461923?text=${message}`, '_blank');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const resetChat = () => {
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: initialGreeting,
-        timestamp: new Date(),
-      },
-    ]);
-    setConversationHistory([]);
-  };
+const Chatbot = ({ isOpen, onClose }: ChatbotProps) => {
+  const [iframeKey, setIframeKey] = useState(0);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[600px] max-h-[80vh] bg-background rounded-2xl shadow-xl border border-border flex flex-col overflow-hidden animate-slide-up">
-      {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-border bg-secondary/30">
-        <div className="flex items-center gap-4">
-          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-primary/20 shrink-0">
+    <section
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background animate-slide-up sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(720px,calc(100vh-3rem))] sm:w-[420px] sm:rounded-2xl sm:border sm:border-border sm:shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Johanna, Retreats Holidays concierge"
+    >
+      <header className="flex items-center justify-between border-b border-border bg-secondary/30 px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-primary/10 ring-2 ring-primary/20 sm:h-14 sm:w-14">
             <img
-              src="travel-assistant.jpeg"
+              src="/travel-assistant.jpeg"
               alt="Johanna"
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
           </div>
-          <div>
-            <h3 className="font-semibold text-foreground text-lg">Johanna</h3>
-            <p className="text-sm text-muted-foreground">Concierge &amp; Provider Matching</p>
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold text-foreground">Johanna</h2>
+            <p className="truncate text-sm text-muted-foreground">
+              Concierge &amp; Provider Matching
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+
+        <div className="ml-2 flex shrink-0 items-center gap-1">
           <button
-            onClick={resetChat}
-            className="p-2 hover:bg-secondary rounded-lg transition-colors"
-            aria-label="Reset chat"
+            type="button"
+            onClick={() => setIframeKey((key) => key + 1)}
+            className="rounded-lg p-2 transition-colors hover:bg-secondary"
+            aria-label="Restart Johanna"
           >
-            <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            <RefreshCw className="h-4 w-4 text-muted-foreground" />
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 hover:bg-secondary rounded-lg transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-secondary"
             aria-label="Close chat"
           >
-            <X className="w-4 h-4 text-muted-foreground" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className="animate-fade-in">
-            {message.role === 'user' ? (
-              <div className="flex justify-end">
-                <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
-                  {message.content}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="bg-secondary rounded-2xl rounded-tl-sm px-4 py-2 max-w-[85%] text-sm text-foreground">
-                  {message.content}
-                </div>
-                {message.retreats && message.retreats.length > 0 && (
-                  <div className="space-y-3 mt-2 w-full">
-                    {message.retreats.map((retreat) => {
-                      const isUnlocked = isRetreatUnlocked(retreat, unlockedRetreatIds);
-                      const displayRetreat = isUnlocked
-                        ? retreat
-                        : { ...retreat, sourceUrl: undefined };
-
-                      return (
-                        <RetreatCard
-                          key={retreat.id}
-                          retreat={displayRetreat}
-                          unlocked={isUnlocked}
-                          onBook={() => onBookRetreat(retreat)}
-                          onWhatsApp={handleWhatsApp}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-        
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-secondary rounded-2xl px-4 py-3 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Thinking...</span>
-            </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="p-4 border-t border-border bg-secondary/20">
-        <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-4 py-2">
-          <button
-            onClick={toggleListening}
-            disabled={isLoading}
-            className={`p-2 rounded-full transition-all ${
-              isListening 
-                ? 'bg-red-500 text-white animate-pulse' 
-                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            aria-label={isListening ? "Stop listening" : "Start voice input"}
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isListening ? "Listening..." : "Type or speak your message..."}
-            className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-            disabled={isLoading || isListening}
-          />
-          <button
-            onClick={() => handleSendMessage()}
-            disabled={!input.trim() || isLoading || isListening}
-            className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-        {isListening && (
-          <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse">
-            🎤 Listening... Speak your travel preferences
-          </p>
-        )}
-      </div>
-    </div>
+      <iframe
+        key={iframeKey}
+        src={JOHANNA_EMBED_URL}
+        title="Johanna — Retreats Holidays concierge"
+        className="min-h-0 flex-1 border-0 bg-background"
+        allow="microphone; clipboard-write"
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    </section>
   );
 };
 
